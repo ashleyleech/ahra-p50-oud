@@ -1,0 +1,788 @@
+---
+title: "Pharmacotherapy for Pregnant Women with Opioid Use Disorder "
+author: "<br>Ahra Kim, MPH<br>"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    fig_caption: yes
+    number_sections: yes
+    theme: cosmo
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: yes
+---
+
+<style type="text/css">
+body, td{
+  font-size: 14px;
+}
+code.r{
+  font-size: 12px;
+}
+pre{
+  font-size: 12px
+}
+div.main-container {
+  max-width: 1800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE, comment=NA}
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	comment = NA,
+	cache = FALSE
+)
+setwd("/Volumes/p50_oud/Ahra") 
+
+# suppress scientific notation
+options(scipen = 999)
+options(knitr.kable.NA = '')
+
+library(Hmisc)
+library(tangram)
+library(readr)
+library(haven)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(ggplot2)
+library(ggh4x)
+# library(plotly)
+# library(data.table)
+library(reshape2)
+library(janitor)
+library(kableExtra)
+# library(UpSetR)
+library(survival)
+library(rms)
+library(mice)
+library(PSW)
+
+
+# source("make_cph_table.R")
+options(prType="html")
+
+# table style to show percent complete/missing N in demographics
+nejm <- tangram::nejm # Copy style/transform into local environment
+
+# Override the generation of N values for the transform
+nejm[["Cell"]][["n"]] <- function(n, class=NULL, hdr=FALSE, possible=NULL, ...)
+{
+  n <- if(hdr) paste0("(N=",as.character(n),")") else
+       if(is.null(possible)) as.character(n) else
+         paste0(as.character(n), " (", render_f(as.numeric(n)/possible*100, 2), ")")
+  
+  cell(n, class=c("cell_n", class), ...)
+}
+
+
+# load("/Volumes/p50_oud/Ahra/G5_data_202503.Rdata")
+# load("/Volumes/p50_oud/Ahra/G5_data_202506.Rdata")
+# load("/Volumes/p50_oud/Ahra/G5_data_202509.Rdata")
+# save.image(file="moud_cohort_all_tables_202601.Rdata")
+# load("/Volumes/p50_oud/Ahra/moud_cohort_all_tables_202601.Rdata")
+load("/Volumes/p50_oud/Ahra/moud_cohort_202601.Rdata")
+```
+
+
+
+# Introduction 
+
+<br>
+
+This project focuses on Analysis 2 of the Study Protocol, which aims to characterize pregnant individuals with OUD and examine hazards of maternal death and overdose. A poster was presented at Academy Health annual research meeting focusing on analysis on those with OUD and at least one day of MOUD prescription. (Section 7)
+
+## Methods
+
+<br>
+
+Data Source
+
++ TennCare data
++ TN all payer hospitalization database
++ Birth and death certificates
++ US Census data
+
+<br>
+
+Inclusion Criteria
+
++ Women 15-44 years old
++ Delivery of an infant >=20 weeks between 2007-2020
++ Continuous enrollment in TennCare from 90 pre-delivery through 41 days post partum
++ No sickle cell disease or active malignancy
++ With and without MOUD receipt initially, but only included those with MOUD for main analysis
++ Up to 5-days gap of continuous enrollment
+
+<br>
+
++ Exposure: Days of MOUD supply between -90 days prior to delivery and +41 days post-delivery (maximum number of days = 132)
++ Covariates also collected during exposure period 
++ Outcomes: first event of either overdose or death from 42 days post-delivery
+
+<br>
+
+Statistical analysis
+
+Descriptive statistics were computed using frequencies (proportions) and medians (IQRs) as appropriate for the overall sample and also stratified by timing of MOUD receipt. Timing of MOUD receipt variable was categorized relative to timing of delivery and has two levels: receipt during one period only either pre- or post-delivery or receipt during both pre- and post-delivery periods. Due to the low number of outcomes, several variables were collapsed into one. These variables are listed below. 
+
+<br>
+
++ Route of delivery: Cesarean or Vaginal (Vaginal + Forcep + Vacuum)
++ Pain conditions: Back pain + dental pain + fibromyalgia + indicator for NSAIDs 
++ Alcohol use disorder + other substance use
++ Benzodiazepine + Anticonvulsant use 
++ Anxiety + Depression
+
+<br>
+
+After calculating the number of days of MOUD receipt, various histograms were plotted to examine differences by method. Then, multivariable Cox Proportional hazards model were used to determine the associations between total days of MOUD receipt as the main exposure and death or overdose as the outcome. For individuals with multiple outcomes, the earliest outcome was used. Outcomes that occurred during the follow-up period were counted if they were captured in the TN all payer database if an individual lost eligibility for TennCare. Average dose per day of MOUD receipt (qty*dose)/(days supply) was also calculated and described in the table. Average days supply and dose from the pre-delivery period that exceeded 90 days was carried over and added to the post-delivery period. 
+
+<br>
+
+The Cox model was first modeled using linear continuous terms, due to the limited degrees of freedom. However, year of delivery was determined to be non-linear and was modeled using a restricted cubic spline with 3 knots. These models included the following covariates: year of delivery, total day MOUD receipt, age at delivery, gestation weeks, route of delivery, combined pain conditions, alcohol/other substance use, benzodiazepine/anticonvulsant use, anxiety/depression, maternal morbidity (CDC defined). Additional covariates were included initially but were removed due to the small number of outcomes. These include race/ethnicity combined, number of previous pregnancies, schizophrenia/personality disorder, CDC social vulnerability index, and timing of MOUD receipt (one or two periods relative to delivery). Robust standard errors clustered at the individual level were computed. 
+
+
+Additonal notes: few outcomes (<5) prior to 2015
+
+
+<br>
+
+
+# Study Flow Chart 
+
+## Box 1: Starting cohort 
+
+```{r box1-count}
+  cat("Pregnancies meeting enrollment criteria (BTrack==90):",
+      formatC(n_step1, format = "d", big.mark = ","))
+```
+
+
+
+
+
+# Only including data of women with MOUD receipt 
+## Descriptive Statistics
+
+<br>
+
+<!-- * There are 7055 pregnancies in 6049 unique individuals.  -->
+
+* There are 9048 pregnancies in 7559 unique individuals
+```{r}
+
+# add later
+# death.overdose.new.f +  death.from.od.new.f
+# add final.outcome.f later
+
+comorbidities <- names(moud)[55:70]
+
+tangram(paste('1~ delivery_year[0] + momage[0] +gweeks[0] + momrace.new + momhisp.new + momraceeth.new + routedeliv.new  + previouspregnanciestotaln[0] +
+          final.outcome.f + final.outcome2.f + total.rx.days.exp[0] + total.rx.days.b90[0] + total.rx.days.p41[0] + 
+          total.rx.days.exp2[0] + total.rx.days.b90_2[0] + total.rx.days.p41_2[0] + 
+          total.rx.days.exp3[0] + total.rx.days.b90_3[0] + total.rx.days.p41_3[0] + avg.dose.pre[2] + avg.dose.post[2] + avg.dose.total[2] +
+          total.rx.days.b90_3bup[2] + total.rx.days.p41_3bup[2] +  total.rx.days.total_3bup[2] + avg.dose.pre.bup[2] + avg.dose.post.bup[2] + avg.dose.total.bup[2] + rxtype+
+          pain.combine.f + personality.combine.f + alcuse.othersub.f + benzo.anticonv.f + mat_morbidity.f + anx.dep.comb.f +',
+            noquote(paste0(comorbidities, ".f", collapse="+")), '+ rpl_themes'), 
+        data=moud,  pformat=4, digits=2, style="nejm")
+```
+<br>
+
+## By cases
+```{r}
+moud$outcome.bin.f <- factor(moud$outcome.bin, levels= 0:1, labels=c("No outcome", "Had outcome"))
+label(moud$outcome.bin.f) <- "Outcome"  
+  
+tangram(paste('outcome.bin.f~ delivery_year[0] + momage[0] +gweeks[0] + momrace.new + momhisp.new + momraceeth.new + routedeliv.new  + previouspregnanciestotaln[0] +
+          final.outcome.f + final.outcome2.f + 
+          total.rx.days.exp3[0] + total.rx.days.b90_3[0] + total.rx.days.p41_3[0] + avg.dose.pre[2] + avg.dose.post[2] + avg.dose.total[2] +
+          total.rx.days.b90_3bup[2] + total.rx.days.p41_3bup[2] +  total.rx.days.total_3bup[2] + avg.dose.pre.bup[2] + avg.dose.post.bup[2] + avg.dose.total.bup[2] +
+          pain.combine.f + personality.combine.f + alcuse.othersub.f + benzo.anticonv.f + mat_morbidity.f + anx.dep.comb.f +',
+            noquote(paste0(comorbidities, ".f", collapse="+")), '+ rpl_themes'), 
+        data=moud,  pformat=4, digits=2, style="nejm", test=TRUE)
+```
+
+
+<br>
+
+## MOUD information
+
+```{r}
+tangram(1~ moud.pre + moud.pre2 + moud.pre3 + moud.post + moud.post2 + moud.post3 +
+          moud.both + moud.both2 + moud.both3, data= moud, pformat=4, digits=2, style= "nejm", collapse_single=FALSE)
+```
+<br>
+
+
+
+## Characteristics based on MOUD timing (method 3)
+### Two categories
+```{r}
+moud$moud.both3 <- droplevels(moud$moud.both3)
+label(moud$moud.both3) <- "MOUD receipt timing"
+
+moud$final.outcome.3lev <- ifelse(moud$final.outcome==1, 1, 
+                                  ifelse(moud$final.outcome==2, 2, NA))
+moud$final.outcome.3lev <- ifelse(is.na(moud$final.outcome.3lev), 3, moud$final.outcome.3lev)
+moud$final.outcome.3lev.f <- factor(moud$final.outcome.3lev, levels=1:3, labels=c("Death", "Overdose", "Censored"))
+label(moud$final.outcome.3lev.f) <- "Final outcome 3 levels"
+
+tangram(paste('moud.both3~ delivery_year[0] + delivery.year.cat + momage[0] +gweeks[0] + momrace.new + momhisp.new + momraceeth.new + routedeliv.new  + previouspregnanciestotaln[0] +
+          final.outcome.f + final.outcome.3lev.f + total.rx.days.exp[0] + total.rx.days.b90[0] + total.rx.days.p41[0] + 
+          total.rx.days.exp2[0] + total.rx.days.b90_2[0] + total.rx.days.p41_2[0] + 
+          total.rx.days.exp3[0] + total.rx.days.b90_3[0] + total.rx.days.p41_3[0] +  avg.dose.pre[2] + avg.dose.post[2] + avg.dose.total[2] + 
+          total.rx.days.b90_3bup[2] + total.rx.days.p41_3bup[2] +  total.rx.days.total_3bup[2] + avg.dose.pre.bup[2] + avg.dose.post.bup[2] + avg.dose.total.bup[2] +
+          pain.combine.f + personality.combine.f + alcuse.othersub.f + benzo.anticonv.f + mat_morbidity.f + anx.dep.comb.f +',
+            noquote(paste0(comorbidities, ".f", collapse="+")), '+ rpl_themes'), 
+        data=moud, test=TRUE, pformat=4, digits=2, style="nejm")
+```
+
+<br>
+
+### Three categories
+```{r}
+moud$moud.both3div <- droplevels(moud$moud.both3div)
+label(moud$moud.both3div) <- "MOUD receipt timing"
+tangram(paste('moud.both3div~ delivery_year[0] + delivery.year.cat + momage[0] +gweeks[0] + momrace.new + momhisp.new + momraceeth.new + routedeliv.new  + previouspregnanciestotaln[0] +
+          final.outcome.f + final.outcome.3lev.f + total.rx.days.exp[0] + total.rx.days.b90[0] + total.rx.days.p41[0] + 
+          total.rx.days.exp2[0] + total.rx.days.b90_2[0] + total.rx.days.p41_2[0] + 
+          total.rx.days.exp3[0] + total.rx.days.b90_3[0] + total.rx.days.p41_3[0] +  avg.dose.pre[2] + avg.dose.post[2] + avg.dose.total[2] + 
+          total.rx.days.b90_3bup[2] + total.rx.days.p41_3bup[2] +  total.rx.days.total_3bup[2] + avg.dose.pre.bup[2] + avg.dose.post.bup[2] + avg.dose.total.bup[2] +
+          pain.combine.f + personality.combine.f + alcuse.othersub.f + benzo.anticonv.f + mat_morbidity.f + anx.dep.comb.f +',
+            noquote(paste0(comorbidities, ".f", collapse="+")), '+ rpl_themes'), 
+        data=moud, test=TRUE, pformat=4, digits=2, style="nejm")
+```
+
+
+<br>
+
+## Histogram of MOUD days supplied
+### Before delivery up to 90 days (Method 1)
+```{r}
+ggplot(moud, aes(x=total.rx.days.b90)) + 
+  geom_histogram(color="black", fill="white") +
+  scale_x_continuous(breaks = seq(0, 90, 10)) + 
+  labs(x= "Days", y="Count") +
+  theme_classic()
+```
+
+### Before delivery up to 90 days (Method 2)
+```{r}
+ggplot(moud, aes(x=total.rx.days.b90_2)) + 
+  geom_histogram(color="black", fill="white") +
+  scale_x_continuous(breaks = seq(0, 90, 10)) + 
+  labs(x= "Days", y="Count") +
+  theme_classic()
+```
+
+<br>
+
+### Before delivery up to 90 days (Method 3)
+```{r}
+ggplot(moud, aes(x=total.rx.days.b90_3)) + 
+  geom_histogram(color="black", fill="white") +
+  scale_x_continuous(breaks = seq(0, 90, 10)) + 
+  labs(x= "Days", y="Count") +
+  theme_classic()
+```
+
+<br>
+
+### After delivery up to 41 days (Method 1)
+```{r}
+ggplot(moud, aes(x=total.rx.days.p41_2)) + 
+  geom_histogram(color="black", fill="white") +
+  scale_x_continuous(breaks = seq(0, 30, 10)) + 
+  labs(x= "Days", y="Count") +
+  theme_classic()
+```
+
+### After delivery up to 41 days (Method 3)
+```{r}
+ggplot(moud, aes(x=total.rx.days.p41_2)) + 
+  geom_histogram(color="black", fill="white") +
+  scale_x_continuous(breaks = seq(0, 30, 10)) + 
+  labs(x= "Days", y="Count") +
+  theme_classic()
+```
+
+<br>
+
+### After delivery up to 41 days (Method 3)
+```{r}
+ggplot(moud, aes(x=total.rx.days.p41_3)) + 
+  geom_histogram(color="black", fill="white") +
+  scale_x_continuous(breaks = seq(0, 30, 10)) + 
+  labs(x= "Days", y="Count") +
+  theme_classic()
+```
+
+
+<br>
+
+### Entire exposure (Method 1)
+```{r}
+ggplot(moud, aes(x=total.rx.days.exp)) + 
+  geom_histogram(color="black", fill="white") +
+  scale_x_continuous(breaks = seq(0, 130, 10)) + 
+  labs(x= "Days", y="Count") +
+  theme_classic()
+```
+
+<br>
+
+
+### Entire exposure (Method 2)
+```{r}
+ggplot(moud, aes(x=total.rx.days.exp2)) + 
+  geom_histogram(color="black", fill="white") +
+  scale_x_continuous(breaks = seq(0, 130, 10)) + 
+  labs(x= "Days", y="Count") +
+  theme_classic()
+```
+
+<br>
+
+### Entire exposure (Method 3)
+```{r}
+ggplot(moud, aes(x=total.rx.days.exp3)) + 
+  geom_histogram(color="black", fill="white") +
+  scale_x_continuous(breaks = seq(0, 130, 10)) + 
+  labs(x= "Days", y="Count") +
+  theme_classic()
+```
+
+<br>
+
+# Survival Analysis {-}
+
+## Kaplan Meier Plot 
+```{r}
+kmoutm <- survfit(Surv(days.to.event, outcome.bin) ~1, data=moud)
+print(kmoutm)
+# test with survminer
+# survminer::ggsurvplot(kmout, data=basic, fun="event")
+
+#KM survival curve for only 1 year
+# plot(kmoutm, conf.int=FALSE, col=c("red", "blue"), xlab="Days since 41-days post-partum", ylab="Probability of Death or Overdose", main= "KM curves by MOUD timing", xlim=c(0, 365), fun="event")
+# legend('bottomright', c("Either pre or post", "Both pre and post"), col=c("red", "blue"), lty=1)
+
+plot(kmoutm, conf.int=FALSE, col=c("red", "blue"), xlab="Days since 41-days post-partum", ylab="Probability of Death or Overdose", xlim=c(0, 323), fun="event")
+
+summary(kmoutm$time)
+
+kable(data.frame(kmoutm$time, kmoutm$surv), col.names = c("time", "probability"))
+```
+
+<br>
+
+## Time to event for overdose and death
+```{r}
+deathod <- moud[which(moud$final.outcome.f %in% c("Death", "Overdose")), ]
+describe(deathod$days.to.event)
+
+death <- deathod[which(deathod$final.outcome.f=="Death"), ]
+describe(death$days.to.event)
+
+od <- deathod[which(deathod$final.outcome.f=="Overdose"), ]
+describe(od$days.to.event)
+```
+
+
+
+# Multivariable Cox PH model
+## Linear continuous terms
+```{r, warning=FALSE, message=NA, include=FALSE}
+
+dd <- datadist(moud)
+options(datadist= 'dd')
+dd$limits$pain.combine.f[2] <- "No"
+dd$limits$alcuse.othersub.f[2] <- "No"
+dd$limits$moud.both3[2] <- "Either pre or post"
+# 
+# #follow up time should be log with MI interacted with outcome for MI
+# set.seed(90)
+# 
+# basic$follow.up.days.log10 <- log10(basic$follow.up.days + 0.01)
+# basic$follow.up.days.minus42 <- basic$follow.up.days - 42
+# basic$follow.up.days.minus42.log10 <- log10(basic$follow.up.days.minus42 + 0.01)
+# 
+# # interact followup days with outcome # standard procedure in biostats
+# 
+# #Covariates are age, race/ethnicity combined, SVI, route of delivery, maternal morbidity, number of prior pregnancies, gestational weeks, number of MOUD days, pain combined, personality disorders combined, anxiety, depression, substance use combined, medications combined
+# 
+# 
+# cph_multi_i <- aregImpute(~ (follow.up.days.log10*death.or.od) + momage + momraceeth.new + rpl_themes + routedeliv.new + previouspregnanciestotaln + gweeks + total.rx.days.exp +
+#                             pain.combine.f + personality.combine.f + alcuse.othersub.f + benzo.anticonv.f + anxiety.f + depression.f + mat_morbidity.f , data=basic, n.impute = 20)
+# 
+# cph_multi <- fit.mult.impute(Surv(follow.up.days.log10, death.or.od) ~ moud.yes.f + total.rx.days.exp + delivery_year+  momage + momraceeth_comb.new + rpl_themes + routedeliv.new + previouspregnanciestotaln + gweeks +
+#                             pain.combine.f + personality.combine.f + alcuse.othersub.f + benzo.anticonv.f + anxiety.f + depression.f + mat_morbidity.f,
+#                              data=basic, fitter = cph, xtrans= cph_multi_i, n.impute=20, y=TRUE, x=TRUE, surv=TRUE)
+
+cph_multim <- cph(Surv(days.to.event, outcome.bin) ~ delivery_year + total.rx.days.exp3 +  momage +  routedeliv.new + gweeks +  
+                   pain.combine.f +  alcuse.othersub.f + benzo.anticonv.f + anx.dep.comb.f + mat_morbidity.f , data=moud, x=TRUE, y=TRUE) 
+# cox.zph(cph_multim) # PH assumption met
+```
+
+```{r}
+
+print(summary(robcov(cph_multim, cluster = moud$unique_id.x), momage=c(27,31), total.rx.days.exp3=c(1, 31), delivery_year=c(2016, 2018), gweeks=c(39, 37),
+              vnames = 'labels'))
+print(anova(robcov(cph_multim), vnames="labels"), digits=2)
+
+```
+
+```{r, fig.height=6, fig.width=8}
+plot(summary(cph_multim, momage=c(27, 31), total.rx.days.exp3=c(1, 31), delivery_year=c(2016, 2018), gweeks=c(39, 37),  vnames = 'labels'))
+```
+
+```{r, fig.height=12, fig.width=12}
+ggplot(Predict(cph_multim, fun=plogis), ylab=expression(hat(P)), sepdiscrete="vertical")
+# ggplot(Predict(cph_multim, delivery_year=c(2007:2020), fun=plogis), ylab=expression(hat(P)), sepdiscrete="vertical")
+probdf <- Predict(cph_multim, total.rx.days.exp3=c(1, 31, 61, 89, 119, 132), delivery_year=c(2007:2020), momage=27, gweeks=39, fun=plogis)
+
+ggplot(Predict(cph_multim, delivery_year=c(2007:2020), total.rx.days.exp3=89, momage=27, gweeks=39, fun=plogis), ylab="Probability of Outcome") + scale_x_continuous(breaks = c(2008, 2010, 2012, 2014, 2016, 2018, 2020))
+ggplot(Predict(cph_multim, total.rx.days.exp3=c(1:132), delivery_year=2016, momage=27, gweeks=39, fun=plogis), ylab="Probability of Outcome", xlab = "Total Days") + scale_x_continuous(breaks = c(0, 30, 60, 90, 120))
+```
+
+<br>
+
+### Univariable HR
+```{r}
+cph_uni <- cph(Surv(days.to.event, outcome.bin) ~ total.rx.days.exp3 , data=moud, x=TRUE, y=TRUE) 
+
+print(summary(robcov(cph_uni, cluster = moud$unique_id.x),  total.rx.days.exp3=c(1, 31), vnames = 'labels'))
+print(anova(robcov(cph_uni), vnames="labels"), digits=2)
+```
+
+
+
+## With splines
+```{r, include=FALSE, warning=FALSE, message=FALSE}
+# cph_multi_sp <- fit.mult.impute(Surv(follow.up.days.log10, death.or.od) ~  rcs(delivery_year, 3)  + total.rx.days.exp  + momage + momraceeth_comb.new + rpl_themes + routedeliv.new + previouspregnanciestotaln + gweeks +
+#                                   pain.combine.f + personality.combine.f + alcuse.othersub.f + benzo.anticonv.f + anxiety.f + depression.f + mat_morbidity.f + moud.yes.f,
+#                                 data=basic, fitter = cph, xtrans= cph_multi_i, n.impute=20, y=TRUE, x=TRUE, surv=TRUE)
+
+cph_multi_spm <- cph(Surv(days.to.event, outcome.bin) ~ rcs(delivery_year,3) + total.rx.days.exp3 +  momage  + routedeliv.new + gweeks +  
+                   pain.combine.f + alcuse.othersub.f + benzo.anticonv.f + anx.dep.comb.f + mat_morbidity.f , data=moud, x=TRUE, y=TRUE) 
+
+```
+
+```{r}
+# print(summary(robcov(cph_multi_sp, cluster = basic$unique_id.x), delivery_year=c(2016, 2020),  momage=c(25, 30), rpl_themes=c(0.5, 0.75), total.rx.days.exp=c(0,1), vnames = 'labels'), digits=3)
+# print(anova(robcov(cph_multi_sp), vnames="labels"), digits=3)
+# x <- Predict(cph_multi_sp, delivery_year=c(2007:2020))
+# x$yhat_exp <- exp(x$yhat)
+# x$lower_exp <- exp(x$lower)
+# x$upper_exp <- exp(x$upper)
+
+print(summary(robcov(cph_multi_spm, cluster = moud$unique_id.x), momage=c(27,31),  total.rx.days.exp3=c(1, 31), delivery_year=c(2016, 2018), gweeks=c(39,37),  vnames = 'labels'))
+# print(summary(robcov(cph_multi_sp, cluster = moud$unique_id.x),  total.rx.days.exp3=c(1, 31), delivery_year=c(2007,2015),  vnames = 'labels'))
+# print(summary(robcov(cph_multi_sp, cluster = moud$unique_id.x),  total.rx.days.exp3=c(1, 31), delivery_year=c(2010,2014),  vnames = 'labels'))
+# print(summary(robcov(cph_multi_sp, cluster = moud$unique_id.x),  total.rx.days.exp3=c(1, 31), delivery_year=c(2015, 2017),  vnames = 'labels'))
+# 
+# print(summary(robcov(cph_multi_sp, cluster = moud$unique_id.x),  total.rx.days.exp3=c(1, 31), delivery_year=c(2015, 2020),  vnames = 'labels'))
+# print(summary(robcov(cph_multi_sp, cluster = moud$unique_id.x),  total.rx.days.exp3=c(1, 31), delivery_year=c(2017, 2020),  vnames = 'labels'))
+# print(summary(robcov(cph_multi_sp, cluster = moud$unique_id.x),  total.rx.days.exp3=c(1, 31), delivery_year=c(2017, 2018),  vnames = 'labels'))
+
+print(anova(robcov(cph_multi_spm), vnames="labels"), digits=3)
+
+```
+
+```{r,fig.height=6, fig.width=8}
+plot(summary(cph_multi_spm, momage=c(25, 35),   total.rx.days.exp3=c(1, 31), delivery_year=c(2016, 2018), vnames = 'labels'))
+```
+
+```{r, fig.height=12, fig.width=12}
+ggplot(Predict(cph_multi_spm, fun=plogis), ylab=expression(hat(P)), sepdiscrete="vertical")
+
+```
+
+<br>
+
+## Linear model (only buprenorphine)
+```{r, include=FALSE, warning=FALSE, message=FALSE}
+# cph_multi_sp <- fit.mult.impute(Surv(follow.up.days.log10, death.or.od) ~  rcs(delivery_year, 3)  + total.rx.days.exp  + momage + momraceeth_comb.new + rpl_themes + routedeliv.new + previouspregnanciestotaln + gweeks +
+#                                   pain.combine.f + personality.combine.f + alcuse.othersub.f + benzo.anticonv.f + anxiety.f + depression.f + mat_morbidity.f + moud.yes.f,
+#                                 data=basic, fitter = cph, xtrans= cph_multi_i, n.impute=20, y=TRUE, x=TRUE, surv=TRUE)
+
+onlybup <- moud[!is.na(moud$total.rx.days.total_3bup), ]
+cph_multi_spm2 <- cph(Surv(days.to.event, outcome.bin) ~ delivery_year + total.rx.days.total_3bup +  momage  + routedeliv.new + gweeks +  
+                   pain.combine.f + alcuse.othersub.f + benzo.anticonv.f + anx.dep.comb.f + mat_morbidity.f , data=moud, x=TRUE, y=TRUE) 
+
+```
+
+```{r}
+
+print(summary(robcov(cph_multi_spm2, cluster = moud$unique_id.x), momage=c(27,31),  total.rx.days.total_3bup=c(1, 31), delivery_year=c(2016, 2018), gweeks=c(39, 37),  vnames = 'labels'))
+
+print(anova(robcov(cph_multi_spm2), vnames="labels"), digits=3)
+
+```
+
+<br>
+
+### Univariate 
+```{r}
+cph_uni2 <- cph(Surv(days.to.event, outcome.bin) ~ total.rx.days.total_3bup , data=moud, x=TRUE, y=TRUE) 
+print(summary(robcov(cph_uni2, cluster = moud$unique_id.x), total.rx.days.total_3bup=c(1, 31),  vnames = 'labels'))
+
+print(anova(robcov(cph_uni2), vnames="labels"), digits=3)
+
+
+```
+
+
+# By MOUD timing {-}
+# Survival analysis
+## KM Curves
+```{r}
+kmout_moud <- survfit(Surv(days.to.event, outcome.bin) ~moud.both3div, data=moud)
+# test with survminer
+# survminer::ggsurvplot(kmout, data=basic, fun="event")
+
+#KM survival curve for only 1 year
+plot(kmout_moud, conf.int=FALSE, col=c("red", "black", "blue"), xlab="Days Since 41-days Post-Partum", ylab="Probability of Death or Overdose", main= "KM curves by MOUD timing", xlim=c(0, 323), fun="event")
+legend('bottomright', c("Pre-delivery", "Post-delivery", "Both"), col=c("red","black", "blue"), lty=1)
+
+
+kable(data.frame(kmout_moud$time, kmout_moud$surv), col.names = c("time", "probability"))
+```
+
+
+## Log-Rank Test
+
+```{r}
+surv_diff_moud <- survdiff(Surv(days.to.event, outcome.bin) ~moud.both3div, data=moud)
+print(surv_diff_moud)
+```
+<br>
+
+## Multivariable Cox PH model
+## Linear continuous terms (timing + days) {-}
+```{r, warning=FALSE, message=NA, include=FALSE}
+
+dd <- datadist(moud)
+options(datadist= 'dd')
+dd$limits$moud.both3div[2] <- "Both pre and post"
+
+cph_multim_time <- cph(Surv(days.to.event, outcome.bin) ~ moud.both3div + total.rx.days.exp3 + delivery_year +  momage +  routedeliv.new + gweeks +  
+                    pain.combine.f +  alcuse.othersub.f + benzo.anticonv.f + anx.dep.comb.f + mat_morbidity.f , data=moud, x=TRUE, y=TRUE) 
+
+```
+
+```{r}
+
+print(summary(robcov(cph_multim_time, cluster = moud$unique_id.x), momage=c(27,31), total.rx.days.exp3=c(1, 31), delivery_year=c(2016, 2018), gweeks=c(39, 37),
+              vnames = 'labels'))
+print(anova(robcov(cph_multim_time), vnames="labels"), digits=2)
+
+```
+
+```{r, fig.height=6, fig.width=8}
+plot(summary(cph_multim, momage=c(27, 31), total.rx.days.exp3=c(1, 31), delivery_year=c(2016, 2018), gweeks=c(39, 37),  vnames = 'labels'))
+```
+
+```{r, fig.height=12, fig.width=12}
+ggplot(Predict(cph_multim, fun=plogis), ylab=expression(hat(P)), sepdiscrete="vertical")
+```
+
+<br>
+
+## Timing only {-}
+```{r}
+
+cph_multim_time2 <- cph(Surv(days.to.event, outcome.bin) ~ moud.both3div + delivery_year +  momage +  routedeliv.new + gweeks +  
+                    pain.combine.f +  alcuse.othersub.f + benzo.anticonv.f + anx.dep.comb.f + mat_morbidity.f , data=moud, x=TRUE, y=TRUE)
+
+
+```
+
+
+```{r}
+
+print(summary(robcov(cph_multim_time2, cluster = moud$unique_id.x), momage=c(27,31),  delivery_year=c(2016, 2018), gweeks=c(39, 37),
+              vnames = 'labels'))
+print(anova(robcov(cph_multim_time2), vnames="labels"), digits=2)
+
+```
+
+<br>
+
+## Linear continuous terms (timing + days BUP) {-}
+```{r, warning=FALSE, message=NA, include=FALSE}
+
+cph_multim_time_b <- cph(Surv(days.to.event, outcome.bin) ~ moud.both3div + total.rx.days.total_3bup + delivery_year +  momage +  routedeliv.new + gweeks +  
+                    pain.combine.f +  alcuse.othersub.f + benzo.anticonv.f + anx.dep.comb.f + mat_morbidity.f , data=moud, x=TRUE, y=TRUE) 
+
+```
+
+```{r}
+
+print(summary(robcov(cph_multim_time_b, cluster = moud$unique_id.x), momage=c(25,35), total.rx.days.total_3bup=c(1, 31), delivery_year=c(2014, 2018), 
+              vnames = 'labels'))
+print(anova(robcov(cph_multim_time_b), vnames="labels"), digits=2)
+
+```
+
+<br>
+
+## Timing only BUP {-}
+```{r}
+moudbup <- moud[!is.na(moud$total.rx.days.total_3bup),]
+cph_multim_time_b2 <- cph(Surv(days.to.event, outcome.bin) ~ moud.both3div + delivery_year +  momage +  routedeliv.new + gweeks +  
+                    pain.combine.f +  alcuse.othersub.f + benzo.anticonv.f + anx.dep.comb.f + mat_morbidity.f , data=moudbup, x=TRUE, y=TRUE)
+
+
+```
+
+
+```{r}
+
+print(summary(robcov(cph_multim_time_b2, cluster = moudbup$unique_id.x), momage=c(25,35),  delivery_year=c(2014, 2018), 
+              vnames = 'labels'))
+print(anova(robcov(cph_multim_time_b2), vnames="labels"), digits=2)
+
+```
+
+<br>
+
+# Sensitivity analysis 2007-2018
+## Descriptive Statistics
+
+* There are 5728 pregnancies in 5049 unique individuals
+```{r}
+moud18 <- moud[which(moud$delivery_year <= 2018), ]
+
+tangram(paste('1~ delivery_year[0] + momage[0] +gweeks[0] + momrace.new + momhisp.new + momraceeth.new + routedeliv.new  + previouspregnanciestotaln[0] +
+          final.outcome.f + final.outcome2.f + total.rx.days.exp[0] + total.rx.days.b90[0] + total.rx.days.p41[0] + 
+          total.rx.days.exp2[0] + total.rx.days.b90_2[0] + total.rx.days.p41_2[0] + 
+          total.rx.days.exp3[0] + total.rx.days.b90_3[0] + total.rx.days.p41_3[0] + avg.dose.pre[2] + avg.dose.post[2] + avg.dose.total[2] +
+          total.rx.days.b90_3bup[2] + total.rx.days.p41_3bup[2] +  total.rx.days.total_3bup[2] + avg.dose.pre.bup[2] + avg.dose.post.bup[2] + avg.dose.total.bup[2] +
+          pain.combine.f + personality.combine.f + alcuse.othersub.f + benzo.anticonv.f + mat_morbidity.f + anx.dep.comb.f +',
+              noquote(paste0(comorbidities, ".f", collapse="+")), '+ rpl_themes'), 
+        data=moud18,  pformat=4, digits=2, style="nejm")
+```
+
+
+### Time to event for overdose and death
+```{r}
+deathod18 <- moud18[which(moud18$final.outcome.f %in% c("Death", "Overdose")), ]
+describe(deathod18$days.to.event)
+
+death18 <- deathod18[which(deathod18$final.outcome.f=="Death"), ]
+describe(death18$days.to.event)
+
+od18 <- deathod18[which(deathod18$final.outcome.f=="Overdose"), ]
+describe(od18$days.to.event)
+```
+
+<br>
+
+
+## Survival Analysis {-}
+## Kaplan Meier Plot 
+```{r}
+kmoutm18 <- survfit(Surv(days.to.event, outcome.bin) ~1, data=moud18)
+print(kmoutm18)
+# test with survminer
+# survminer::ggsurvplot(kmout, data=basic, fun="event")
+
+#KM survival curve for only 1 year
+# plot(kmoutm, conf.int=FALSE, col=c("red", "blue"), xlab="Days since 41-days post-partum", ylab="Probability of Death or Overdose", main= "KM curves by MOUD timing", xlim=c(0, 365), fun="event")
+# legend('bottomright', c("Either pre or post", "Both pre and post"), col=c("red", "blue"), lty=1)
+
+plot(kmoutm18, conf.int=FALSE, col=c("red", "blue"), xlab="Days since 41-days post-partum", ylab="Probability of Death or Overdose", xlim=c(0, 323), fun="event")
+
+summary(kmoutm18$time)
+
+kable(data.frame(kmoutm18$time, kmoutm18$surv), col.names = c("time", "probability"))
+```
+
+
+## Multivariable Cox PH model {-}
+### Linear continuous terms
+```{r, warning=FALSE, message=NA, include=FALSE}
+
+dd <- datadist(moud18)
+options(datadist= 'dd')
+# dd$limits$pain.combine.f[2] <- "No"
+# dd$limits$alcuse.othersub.f[2] <- "No"
+# dd$limits$moud.both3[2] <- "Either pre or post"
+# 
+cph_multim18 <- cph(Surv(days.to.event, outcome.bin) ~ delivery_year + total.rx.days.exp3 +  momage +  routedeliv.new + gweeks +  
+                    pain.combine.f +  alcuse.othersub.f + benzo.anticonv.f + anx.dep.comb.f + mat_morbidity.f , data=moud18, x=TRUE, y=TRUE) 
+# cox.zph(cph_multim) # PH assumption met
+```
+
+```{r}
+
+print(summary(robcov(cph_multim18, cluster = moud18$unique_id.x), momage=c(27,31), total.rx.days.exp3=c(1, 31), delivery_year=c(2016, 2018), gweeks=c(39,37),
+              vnames = 'labels'))
+print(anova(robcov(cph_multim18), vnames="labels"), digits=2)
+
+```
+
+
+```{r, fig.height=6, fig.width=8}
+plot(summary(cph_multim18, momage=c(25, 35),   total.rx.days.exp3=c(1, 31), delivery_year=c(2016, 2018),  vnames = 'labels'))
+```
+
+
+```{r, fig.height=12, fig.width=12}
+ggplot(Predict(cph_multim18, fun=plogis), ylab=expression(hat(P)), sepdiscrete="vertical")
+```
+
+
+<br>
+  
+### Univariable HR
+```{r}
+cph_uni18 <- cph(Surv(days.to.event, outcome.bin) ~ total.rx.days.exp3 , data=moud18, x=TRUE, y=TRUE) 
+
+print(summary(robcov(cph_uni18, cluster = moud18$unique_id.x),  total.rx.days.exp3=c(1, 31), vnames = 'labels'))
+print(anova(robcov(cph_uni18), vnames="labels"), digits=2)
+```
+
+
+# Sensitivity analysis shift-forward
+```{r}
+tangram(1~  total.rx.days.exp3[0] + total.rx.days.shifted[0], 
+        data=moud, pformat=4, digits=2, style="nejm")
+```
+
+## Survival Analysis 
+## Multivariable Cox PH model {-}
+### Linear continuous terms {-}
+```{r, warning=FALSE, message=NA, include=FALSE}
+dd <- datadist(moud)
+options(datadist= 'dd')
+
+cph_multis <- cph(Surv(days.to.event, outcome.bin) ~ delivery_year + total.rx.days.shifted +  momage +  routedeliv.new + gweeks +  
+                    pain.combine.f +  alcuse.othersub.f + benzo.anticonv.f + anx.dep.comb.f + mat_morbidity.f , data=moud, x=TRUE, y=TRUE) 
+# cox.zph(cph_multim) # PH assumption met
+```
+
+```{r}
+
+print(summary(robcov(cph_multis, cluster = moud$unique_id.x), momage=c(27,31), total.rx.days.shifted=c(1, 31), delivery_year=c(2016, 2018), gweeks=c(39,37),
+              vnames = 'labels'))
+print(anova(robcov(cph_multis), vnames="labels"), digits=2)
+
+```
+
+
+### Univariable HR
+```{r}
+cph_unis <- cph(Surv(days.to.event, outcome.bin) ~  total.rx.days.shifted , data=moud, x=TRUE, y=TRUE) 
+
+print(summary(robcov(cph_unis, cluster = moud$unique_id.x),   total.rx.days.shifted =c(1, 31), vnames = 'labels'))
+print(anova(robcov(cph_unis), vnames="labels"), digits=2)
+```

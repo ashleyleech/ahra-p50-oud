@@ -1183,7 +1183,7 @@ moud <- basic[basic$moud.yes==1, ]
 
 # save moud data
 write.csv(moud, file="moud_cohort_202601.csv", row.names = FALSE)
-save(moud, file="moud_cohort_202601.Rdata")
+save(moud, n_step1, file="moud_cohort_202601.Rdata")
 save.image(file="moud_cohort_all_tables_202601.Rdata")
 
 
