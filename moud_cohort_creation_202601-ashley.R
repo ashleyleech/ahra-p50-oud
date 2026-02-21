@@ -1,5 +1,5 @@
 # data management only
-setwd("/Volumes/p50_oud/Ahra") 
+setwd("/Volumes/HPLWork1/p50_oud/Ashley/Ahra2") 
 
 library(Hmisc)
 library(tangram)
@@ -21,8 +21,8 @@ library(kableExtra)
 # library(mice)
 # library(PSW)
 
-load("/Volumes/p50_oud/Ahra/G5_data_202509.Rdata")
-ndc <- read.csv("/Volumes/p50_oud/Ahra/NDCs_2020.csv", colClasses = c(ndcnum = "character"))
+load("/Volumes/HPLWork1/p50_oud/Ashley/Ahra2/G5_data_202509.Rdata")
+ndc <- read.csv("/Volumes/HPLWork1/p50_oud/Ashley/Ahra2/NDCs_2020.csv", colClasses = c(ndcnum = "character"))
 
 # exclude from cohort if they have these meds: H0020, G2067, and G2078. 
 
@@ -62,7 +62,17 @@ extract <- extract[extract$BTrack==90, ]
 # subset people who are in the exposure group
 # basic <- af_master_new[af_master_new$StudyID %in% extract$StudyID, ]
 # basic <- af_master[af_master$Expose1==1, ] # 998421 to 31199
-basic <- af_master
+
+# AL CHANGES
+# Starting cohort: OUD evidence via diagnosis (Expose1==1) OR MOUD medication in pharmacy file
+# Union ensure MOUD users not captured by Expose1 DX flag are included (per Andrew, Jan 2026)
+basic <- af_master[af_master$BTrack==90 &
+                     (af_master$Expose1==1 | af_master$StudyID %in% extract$StudyID), ]
+n_step1 <- nrow(basic) #this union added 1,983 pregnancies beyond the original 15,951 = 17,934 total (Box 1 in flow diagram)
+
+basic$filledrx <- ifelse(basic$StudyID %in% extract$StudyID, 1, 0)
+table(basic$filledrx) #9,818 have filled MOUD prescription captured in extract; 8,116 do not have an MOUD prescription in extract-but they could still have OUD evidence via Expose1==1 (diagnosis or medication captured through a different route)
+  
 # exclude people if they have an overdose or death from -90 to 41 days
 # not a problem in the new data; everyone has outcome of 42+ days
 # af_outcome$dead_before_follow <- ifelse(!is.na(af_outcome$death_day) & af_outcome$death_day <=41, 1, 
@@ -71,9 +81,6 @@ basic <- af_master
 # af_outcome <- af_outcome[af_outcome$dead_before_follow==0 , ]
 
 # want 90 day only since 180 is for sensitivity
-basic <- basic[basic$BTrack==90, ] # n=15951
-n_step1 <- nrow(basic)
-basic$filledrx <- ifelse(basic$StudyID %in% extract$StudyID, 1, 0)
 
 af_master$unique_id <- sub(".*-", "", af_master$StudyID)
 basic$unique_id <- sub(".*-", "", basic$StudyID)
@@ -99,6 +106,33 @@ twins2 <- twins[twins$multbirths==1,] # these are twins/triplets
 
 # exclude twins/triplets
 basic <- basic[! (basic$rownum %in% twins2$rownum),  ] # n=15328
+# AL ADDED:
+n_step2      <- nrow(basic)
+n_excl_twins <- n_step1 - n_step2
+cat("Unique pregnancies after excluding twins/triplets:", formatC(n_step2, format = "d", big.mark = ","),
+    "| Excluded:", n_excl_twins, "\n")
+# Result from above code: Unique pregnancies after excluding twins/triplets: 17,233 | Excluded: 701
+# Note: the twins/triplets exclusion removes duplicate rows within a single pregnancy 
+# --> where the same mother, same DOB, same gestational week date appears more than once
+# because she delivered multiples--we want to keep one record per pregnancy***
+
+# AL ADDED:
+# Exclude individuals with any overdose during the exposure/baseline window (-90 to +41 days)                      
+# Applied early as an eligibility criterion, using af_outcome directly (af_out not yet created)                    
+# Note: basic still has uppercase StudyID at this point                                                            
+od_exposure_ids <- unique(                                                                                         
+  af_outcome$StudyID[                                                                                              
+    af_outcome$BTrack == 90 &
+      af_outcome$StudyID %in% basic$StudyID &
+      (af_outcome$Overdose_Opioid_exposure == 1 | af_outcome$Overdose_NonOpioid_exposure == 1)
+  ]
+)
+basic              <- basic[!(basic$StudyID %in% od_exposure_ids), ]
+n_step3            <- nrow(basic)
+n_excl_od_exposure <- n_step2 - n_step3
+cat("After excluding overdose in exposure window:", formatC(n_step3, format = "d", big.mark = ","),
+    "| Excluded:", n_excl_od_exposure, "\n")
+##Results from above: After excluding overdose in exposure window: 17,221 | Excluded: 12 
 
 
 # some covariates are in Btrack 180 only and not 90
@@ -148,15 +182,39 @@ label(basic$momraceeth.new) <- "Race/Ethnicity combined"
 
 label(basic$rpl_themes) <- "CDC SVI overall percentile ranking of all 4 themes"
 
-
 #  information related to each delivery/pregnancy
 basic$routedeliv.new <- ifelse(basic$deliverycesarean=="Y", "Cesarean", ifelse(basic$deliveryvaginal=="Y", "Vaginal", ifelse(basic$deliveryforcep=="Y", "Vaginal", ifelse(basic$deliveryvacuum=="Y", "Vaginal", NA))))
 basic$routedeliv.new <- as.factor(basic$routedeliv.new)
 label(basic$routedeliv.new) <- "Route of delivery"
 
+
+# AL ADDITION: Check if any missingness in the delivery category
+# Check af_cov directly - filter to current basic StudyIDs, BTrack==90                                       
+af_cov_check <- af_cov[af_cov$StudyID %in% basic$StudyID & af_cov$BTrack == 90, ]                                  
+
+# Deduplicate since af_cov has multiple rows per StudyID (one per condition)                                       
+af_cov_check_u <- af_cov_check[!duplicated(af_cov_check$StudyID), ]                                                
+
+# How many have all four delivery fields not "Y"?                                                                  
+sum(!af_cov_check_u$DeliveryCesarean %in% "Y" &
+      !af_cov_check_u$DeliveryVaginal  %in% "Y" &
+      !af_cov_check_u$DeliveryForcep   %in% "Y" &
+      !af_cov_check_u$DeliveryVacuum   %in% "Y")
+
+# How many StudyIDs in basic have no record in af_cov at all?
+sum(!basic$StudyID %in% af_cov$StudyID)
+# Results above: 0 & 0, meaning everyone is in the af_cov and everyone has at least one delivery route marked "Y"
+
+
 # exclude if route of delivery everything is marked as "NO"
 # excluded one person
 basic <- basic[!is.na(basic$routedeliv.new), ] #15328 to 15272
+# AL ADDITIONS: 
+n_step4      <- nrow(basic)                                                                                        
+n_excl_route <- n_step3 - n_step4                                                                                  
+cat("After excluding missing route of delivery:", formatC(n_step4, format = "d", big.mark = ","),                  
+    "| Excluded:", n_excl_route, "\n")                                                                           
+
 
 label(basic$previouspregnanciestotaln) <- "Number of previous pregnancies"
 label(basic$cat4_seg1) <- "Enrollment up to 365 days post-partum"
@@ -274,6 +332,9 @@ af_out2 <- af_out %>% group_by(studyid) %>%
 
 af_out2$unique_id <- sub(".*-", "", af_out2$studyid)
 
+# AL Note for below code: exposure==1 conditions below are largely redundant since
+# individuals with any exposure-window overdose were already excluded from "basic" earlier.
+
 # exclude if they had OD in both exposure and outcome
 af_out2 <- af_out2[!(af_out2$overdose_nonopioid_exposure==1 & af_out2$overdose_nonopioid_outcome==1), ]
 af_out2 <- af_out2[!(af_out2$overdose_opioid_exposure==1 & af_out2$overdose_opioid_outcome==1), ]
@@ -283,8 +344,8 @@ af_out2 <- af_out2[!(af_out2$overdose_opioid_exposure==1 & af_out2$overdose_nono
 af_out2 <- af_out2[af_out2$overdose_nonopiod_day >= 0 & af_out2$overdose_nonopiod_day <= 323 | 
                      af_out2$overdose_opiod_day >= 0 & af_out2$overdose_opiod_day <= 323,  ]
 
-# If someone who had multiple births had overdoses for both births, then both information will be included (but this did not happen in the data)
 
+# If someone who had multiple births had overdoses for both births, then both information will be included (but this did not happen in the data)
 
 
 # af_out2 <- af_out %>% group_by(studyid) %>%
@@ -329,12 +390,12 @@ basic$death_day <- ifelse(basic$death_day > 323, NA, basic$death_day)
 # redbook$methadone <- ifelse(grepl("methadone", redbook$gennme2), 1, 0)
 # redbook_methadone <- redbook[redbook$methadone==1, ]
 # write.csv(redbook_methadone, file="redbook_methadone.csv", row.names = FALSE)
-redbook_methadone <- read.csv("/Volumes/p50_oud/Ahra/redbook_methadone.csv")
+redbook_methadone <- read.csv("/Volumes/HPLWork1/p50_oud/Ashley/Ahra2/redbook_methadone.csv")
 redbook_methadone$ndcnum  <-sprintf("%0*s", 11, as.character(redbook_methadone$ndcnum)) 
 
 # redbook2 <- redbook[redbook$ndcnum %in% extract$ndc, ]
 # write.csv(redbook2, file="redbook2.csv", row.names = FALSE)
-redbook2 <- read.csv("/Volumes/p50_oud/Ahra/redbook2.csv")
+redbook2 <- read.csv("/Volumes/HPLWork1/p50_oud/Ashley/Ahra2/redbook2.csv")
 redbook2$ndcnum <-sprintf("%0*s", 11, as.character(redbook2$ndcnum)) 
 extract <- merge(extract, redbook2, by.x="ndc", by.y="ndcnum", all.x = TRUE)
 names(extract)[names(extract)=="gennme.x"] <- "gennme"
@@ -1183,7 +1244,7 @@ moud <- basic[basic$moud.yes==1, ]
 
 # save moud data
 write.csv(moud, file="moud_cohort_202601.csv", row.names = FALSE)
-save(moud, n_step1, file="moud_cohort_202601.Rdata")
+save(moud, n_step1, file="moud_cohort_202601-ashley.Rdata")
 save.image(file="moud_cohort_all_tables_202601.Rdata")
 
 
