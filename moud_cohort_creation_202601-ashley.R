@@ -281,8 +281,34 @@ comorb <- af_cov3 %>% group_by(StudyID) %>%
 
 basic <- merge(basic, comorb, by.x = "studyid", by.y = "StudyID", all.x = TRUE)
 
+# AL: Check whether healthy people are being removed accidentally by line 285: 
+# this next line of code: basic <- basic[basic$studyid %in% comorb$StudyID, ]
+
+# Who gets removed by line 285?                                                                                                                              
+removed_by_285 <- basic$studyid[!basic$studyid %in% comorb$StudyID]                                
+cat("Total removed by line 285:", length(removed_by_285), "\n")  
+# Total removed by line 285: 590
+
+# Of those, how many are completely absent from af_cov?                                                                                                      
+absent_from_afcov <- removed_by_285[!toupper(removed_by_285) %in% toupper(af_cov$StudyID)]
+cat("Absent from af_cov entirely:", length(absent_from_afcov), "\n")
+# Absent from af_cov entirely: 63 
+
+# Of those, how many ARE in af_cov but just have no conditions?
+in_afcov_no_conditions <- removed_by_285[toupper(removed_by_285) %in% toupper(af_cov$StudyID)]
+cat("In af_cov but no conditions (potentially healthy):", length(in_afcov_no_conditions), "\n")
+# In af_cov but no conditions (potentially healthy): 527
+
 # remove those with missing comorbidities
-basic <- basic[basic$studyid %in% comorb$StudyID, ]
+# basic <- basic[basic$studyid %in% comorb$StudyID, ] # previous line 285; AL commented this line out; 
+
+# AL: handle missingness at the analysis stage; We want all people for unadjusted analysis
+# AL: Line 285 (now line 303) removes anyone not in the "comorb" file, so they are dropped from the study
+# entirely, even though their data is perfectly complete but just don't have any comorbidities. 
+# The "route of delivery issue above" only caught truly missing data on all 63 people; 
+# Line 285 catches missing data (63 people) plus healthy people. 
+# The prior code, they had NAs for delivery route because they had no data in af_cov at all; 
+# it was not about delivery route specifically--it was just the first NA check that caught them. 
 
 comorbidities <- names(comorb)[-1] #AL changed to -1, removing manual index update, will capture all
 comorblabs <- gsub("_", " ", comorbidities)
