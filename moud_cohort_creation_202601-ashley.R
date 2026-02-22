@@ -187,6 +187,24 @@ basic$routedeliv.new <- ifelse(basic$deliverycesarean=="Y", "Cesarean", ifelse(b
 basic$routedeliv.new <- as.factor(basic$routedeliv.new)
 label(basic$routedeliv.new) <- "Route of delivery"
 
+# AL CHECK
+key_covs <- c("routedeliv.new", "deliverycesarean", "deliveryvaginal",                                             
+              "momrace_desc", "momethnicity_desc", "momage",                                                       
+              "rpl_themes", "previouspregnanciestotaln")                                                           
+
+# NAs per key covariate
+na_by_cov <- sapply(key_covs, function(v) {
+  if (v %in% names(basic)) sum(is.na(basic[[v]])) else NA_integer_
+})
+print(na_by_cov)
+
+# Which IDs are missing at least one key covariate?
+key_cols_present <- intersect(key_covs, names(basic))
+missing_any_key <- basic$studyid[
+  apply(basic[, key_cols_present], 1, function(x) any(is.na(x)))
+]
+cat("StudyIDs missing at least one key covariate:", length(missing_any_key), "\n")
+
 
 # AL ADDITION: Check if any missingness in the delivery category
 # Check af_cov directly - filter to current basic StudyIDs, BTrack==90                                       
@@ -206,14 +224,17 @@ sum(!basic$StudyID %in% af_cov$StudyID)
 # Results above: 0 & 0, meaning everyone is in the af_cov and everyone has at least one delivery route marked "Y"
 
 
+# AL COMMENTED OUT; NO NEED TO EXCLUDE HERE, DO AT ANALYSIS STAGE SINCE OTHER COVARIATES ARE ALSO MISSING, NOT JUST 63 that are missing for all 
+# These were excluded previously if ALL covariates were missing for individuals, but in reality, some people have some but others 
+# that are missing/etc. and those are handled at the analysis stage; makes sense to handle all at the analysis stage. 
 # exclude if route of delivery everything is marked as "NO"
 # excluded one person
-basic <- basic[!is.na(basic$routedeliv.new), ] #15328 to 15272
+#basic <- basic[!is.na(basic$routedeliv.new), ] #15328 to 15272
 # AL ADDITIONS: 
-n_step4      <- nrow(basic)                                                                                        
-n_excl_route <- n_step3 - n_step4                                                                                  
-cat("After excluding missing route of delivery:", formatC(n_step4, format = "d", big.mark = ","),                  
-    "| Excluded:", n_excl_route, "\n")                                                                           
+#n_step4      <- nrow(basic)                                                                                        
+#n_excl_route <- n_step3 - n_step4                                                                                  
+#cat("After excluding missing route of delivery:", formatC(n_step4, format = "d", big.mark = ","),                  
+#    "| Excluded:", n_excl_route, "\n")                                                                           
 
 
 label(basic$previouspregnanciestotaln) <- "Number of previous pregnancies"
@@ -263,7 +284,7 @@ basic <- merge(basic, comorb, by.x = "studyid", by.y = "StudyID", all.x = TRUE)
 # remove those with missing comorbidities
 basic <- basic[basic$studyid %in% comorb$StudyID, ]
 
-comorbidities <- names(comorb)[2:18]
+comorbidities <- names(comorb)[-1] #AL changed to -1, removing manual index update, will capture all
 comorblabs <- gsub("_", " ", comorbidities)
 comorblabs <- capitalize(comorblabs)
 comorblabs <- gsub("nsaids", "NSAIDS", comorblabs)
@@ -405,6 +426,25 @@ names(extract)[names(extract)=="prodnme.x"] <- "prodnme"
 methadone <- af_extract[which(af_extract$ndc=="H0020"| af_extract$ndc %in% redbook_methadone$ndcnum), ]
 # extract <- extract[!(extract$ndc=="H0020" | extract$ndc %in% redbook_methadone$ndcnum), ] 
 basic <- basic[!(basic$studyid %in% methadone$StudyID), ] #15272 to 15103 observations
+
+# AL ADDED: 
+n_step4          <- nrow(basic)                                                                                                                              
+n_excl_methadone <- n_step3 - n_step4  
+cat("After excluding methadone users:", formatC(n_step4, format = "d", big.mark = ","),
+    "| Excluded:", n_excl_methadone, "\n")
+
+# Unique pregnancies with BTrack==90 methadone
+methadone_90_ids <- unique(methadone$StudyID[methadone$BTrack==90])
+cat("Pregnancies with BTrack==90 methadone:", length(methadone_90_ids), "\n")
+
+# Unique pregnancies with BTrack==180 methadone ONLY (no BTrack==90 record)
+methadone_180_only_ids <- unique(methadone$StudyID[methadone$BTrack==180 &
+                                                     !methadone$StudyID %in% methadone_90_ids])
+cat("Pregnancies with BTrack==180 methadone only:", length(methadone_180_only_ids), "\n")
+
+
+
+
 
 
 # -132 to -43 days = 90 days
