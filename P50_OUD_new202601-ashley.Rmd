@@ -38,7 +38,7 @@ knitr::opts_chunk$set(
 	comment = NA,
 	cache = FALSE
 )
-setwd("/Volumes/p50_oud/Ahra") 
+setwd("/Volumes/HPLWork1/p50_oud/Ashley/Ahra2") 
 
 # suppress scientific notation
 options(scipen = 999)
@@ -63,6 +63,7 @@ library(survival)
 library(rms)
 library(mice)
 library(PSW)
+library(DiagrammeR)
 
 
 # source("make_cph_table.R")
@@ -87,7 +88,7 @@ nejm[["Cell"]][["n"]] <- function(n, class=NULL, hdr=FALSE, possible=NULL, ...)
 # load("/Volumes/p50_oud/Ahra/G5_data_202509.Rdata")
 # save.image(file="moud_cohort_all_tables_202601.Rdata")
 # load("/Volumes/p50_oud/Ahra/moud_cohort_all_tables_202601.Rdata")
-load("/Volumes/p50_oud/Ahra/moud_cohort_202601.Rdata")
+load("/Volumes/HPLWork1/p50_oud/Ashley/Ahra2/moud_cohort_202601-ashley.Rdata")
 ```
 
 
@@ -97,6 +98,56 @@ load("/Volumes/p50_oud/Ahra/moud_cohort_202601.Rdata")
 <br>
 
 This project focuses on Analysis 2 of the Study Protocol, which aims to characterize pregnant individuals with OUD and examine hazards of maternal death and overdose. A poster was presented at Academy Health annual research meeting focusing on analysis on those with OUD and at least one day of MOUD prescription. (Section 7)
+
+
+# Study Flow Chart
+
+```{r flowchart, fig.cap="* Methadone exclusion: n=0 (TennCare OTP coverage began June 2020). Follow-up >1 year exclusion: n=0 (days to event already capped at 365 days)."}                                                                                                                                                            
+  library(DiagrammeR)                                                                                                                                                 
+                                                                                                                                                                      
+  n_bup <- sum(moud$rxtype == "Buprenorphine only", na.rm = TRUE)                                                                                                   
+  n_nal <- sum(moud$rxtype %in% c("Naltrexone only", "Both"), na.rm = TRUE)
+
+  grViz(paste0('
+  digraph consort {
+    graph [layout = dot, rankdir = TB, fontname = Helvetica, nodesep = 0.8, ranksep = 0.6, splines = ortho]
+
+    node [shape = rectangle, fontname = Helvetica, fontsize = 11,
+          style = filled, fillcolor = white, width = 4.5, height = 1]
+    B1 [label = "Pregnancies with OUD evidence\\n(OUD diagnosis or MOUD prescription, BTrack=90)\\nn = ', formatC(n_step1, format="d", big.mark=","), '"]
+    B2 [label = "After excluding duplicate records from\\nmultiple gestation deliveries (twins/triplets)\\nn = ', formatC(n_step2, format="d", big.mark=","), '"]
+    B3 [label = "After excluding overdose in exposure window\\nn = ', formatC(n_step3, format="d", big.mark=","), '"]
+    B4 [label = ">=1 day MOUD receipt (final analytic sample)\\nn = ', formatC(n_step6, format="d", big.mark=","), '"]
+
+    node [shape = rectangle, style = filled, fillcolor = "#f5f5f5", width = 3.5, height = 1]
+    E2 [label = "Excluded: duplicate records from\\nmultiple gestation deliveries\\nn = ', formatC(n_excl_twins, format="d", big.mark=","), '"]
+    E3 [label = "Excluded: overdose in\\nexposure window\\nn = ', formatC(n_excl_od_exposure, format="d", big.mark=","), '"]
+    E4 [label = "Excluded: no MOUD receipt\\nn = ', formatC(n_excl_nomoud, format="d", big.mark=","), '"]
+
+    node [shape = rectangle, style = filled, fillcolor = "#d5e8d4", width = 3.5, height = 1]
+    S1 [label = "Buprenorphine only\\nn = ', formatC(n_bup, format="d", big.mark=","), '"]
+    S2 [label = "Naltrexone only or\\nwith buprenorphine\\nn = ', formatC(n_nal, format="d", big.mark=","), '"]
+
+    B1 -> B2
+    B1 -> E2 [constraint = false]
+    B2 -> B3
+    B2 -> E3 [constraint = false]
+    B3 -> B4
+    B3 -> E4 [constraint = false]
+    B4 -> S1
+    B4 -> S2
+
+    {rank = same; B2; E2}
+    {rank = same; B3; E3}
+    {rank = same; B4; E4}
+    {rank = same; S1; S2}
+  }
+  '))
+```
+
+
+
+
 
 ## Methods
 
@@ -153,18 +204,6 @@ Additonal notes: few outcomes (<5) prior to 2015
 
 
 <br>
-
-
-# Study Flow Chart 
-
-## Box 1: Starting cohort 
-
-```{r box1-count}
-  cat("Pregnancies meeting enrollment criteria (BTrack==90):",
-      formatC(n_step1, format = "d", big.mark = ","))
-```
-
-
 
 
 

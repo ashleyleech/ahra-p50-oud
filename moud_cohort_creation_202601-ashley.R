@@ -54,6 +54,11 @@ extract <- af_extract[which(af_extract$ndc %in% c(ndc$ndcnum, 'Q9991',
 methadonereceipt <- af_extract[af_extract$ndc %in% c("H0020", "G2067", "G2078"), ]
 extract <- extract[!extract$StudyID %in% methadonereceipt$StudyID, ]
 
+# AL: 
+cat("Records with G2067 or G2078 in extract:",
+    sum(extract$ndc %in% c("G2067", "G2078")), "\n")
+# Returns 0 matches in current data -- TennCare did not cover OTP methadone until June 2020
+
 extract <- merge(extract, ndc, by.x="ndc", by.y= "ndcnum", all.x = TRUE)
 extract <- extract[extract$BTrack==90, ]
 # extract$gennme <- ifelse(is.na(extract$gennme) & extract$ndc =="H0020", "Methadone", extract$gennme)
@@ -65,7 +70,7 @@ extract <- extract[extract$BTrack==90, ]
 
 # AL CHANGES
 # Starting cohort: OUD evidence via diagnosis (Expose1==1) OR MOUD medication in pharmacy file
-# Union ensure MOUD users not captured by Expose1 DX flag are included (per Andrew, Jan 2026)
+# Union ensures MOUD users not captured by Expose1 DX flag are included
 basic <- af_master[af_master$BTrack==90 &
                      (af_master$Expose1==1 | af_master$StudyID %in% extract$StudyID), ]
 n_step1 <- nrow(basic) #this union added 1,983 pregnancies beyond the original 15,951 = 17,934 total (Box 1 in flow diagram)
@@ -285,19 +290,20 @@ basic <- merge(basic, comorb, by.x = "studyid", by.y = "StudyID", all.x = TRUE)
 # this next line of code: basic <- basic[basic$studyid %in% comorb$StudyID, ]
 
 # Who gets removed by line 285?                                                                                                                              
-removed_by_285 <- basic$studyid[!basic$studyid %in% comorb$StudyID]                                
-cat("Total removed by line 285:", length(removed_by_285), "\n")  
+# removed_by_285 <- basic$studyid[!basic$studyid %in% comorb$StudyID]                                
+# cat("Total removed by line 285:", length(removed_by_285), "\n")  
 # Total removed by line 285: 590
 
 # Of those, how many are completely absent from af_cov?                                                                                                      
-absent_from_afcov <- removed_by_285[!toupper(removed_by_285) %in% toupper(af_cov$StudyID)]
-cat("Absent from af_cov entirely:", length(absent_from_afcov), "\n")
+# absent_from_afcov <- removed_by_285[!toupper(removed_by_285) %in% toupper(af_cov$StudyID)]
+# cat("Absent from af_cov entirely:", length(absent_from_afcov), "\n")
 # Absent from af_cov entirely: 63 
 
 # Of those, how many ARE in af_cov but just have no conditions?
-in_afcov_no_conditions <- removed_by_285[toupper(removed_by_285) %in% toupper(af_cov$StudyID)]
-cat("In af_cov but no conditions (potentially healthy):", length(in_afcov_no_conditions), "\n")
-# In af_cov but no conditions (potentially healthy): 527
+# in_afcov_no_conditions <- removed_by_285[toupper(removed_by_285) %in% toupper(af_cov$StudyID)]
+# cat("In af_cov but no conditions (potentially healthy):", length(in_afcov_no_conditions), "\n")
+# In af_cov but no conditions (potentially healthy): 527 in the af_cov but with no conditions in the 
+# 16-item tracked comorbidity list. 
 
 # remove those with missing comorbidities
 # basic <- basic[basic$studyid %in% comorb$StudyID, ] # previous line 285; AL commented this line out; 
@@ -306,7 +312,7 @@ cat("In af_cov but no conditions (potentially healthy):", length(in_afcov_no_con
 # AL: Line 285 (now line 303) removes anyone not in the "comorb" file, so they are dropped from the study
 # entirely, even though their data is perfectly complete but just don't have any comorbidities. 
 # The "route of delivery issue above" only caught truly missing data on all 63 people; 
-# Line 285 catches missing data (63 people) plus healthy people. 
+# Line 285 catches missing data (63 people) plus people without the listed comorbidities.  
 # The prior code, they had NAs for delivery route because they had no data in af_cov at all; 
 # it was not about delivery route specifically--it was just the first NA check that caught them. 
 
@@ -448,16 +454,25 @@ extract <- merge(extract, redbook2, by.x="ndc", by.y="ndcnum", all.x = TRUE)
 names(extract)[names(extract)=="gennme.x"] <- "gennme"
 names(extract)[names(extract)=="prodnme.x"] <- "prodnme"
 
-# make sure the individual is excluded if they have used methadone
-methadone <- af_extract[which(af_extract$ndc=="H0020"| af_extract$ndc %in% redbook_methadone$ndcnum), ]
-# extract <- extract[!(extract$ndc=="H0020" | extract$ndc %in% redbook_methadone$ndcnum), ] 
-basic <- basic[!(basic$studyid %in% methadone$StudyID), ] #15272 to 15103 observations
 
-# AL ADDED: 
-n_step4          <- nrow(basic)                                                                                                                              
-n_excl_methadone <- n_step3 - n_step4  
+# make sure the individual is excluded if they have used methadone for OUD treatment                                                                         
+# AL: restricted to exposure window (BTrack==90, Rx_B90_DOB==1 or Rx_DOB_P41==1)                                                                             
+# AL: HCPCS codes only — redbook NDCs removed as these capture methadone for pain, not OUD
+methadone <- af_extract[af_extract$BTrack==90 &
+                          (af_extract$Rx_B90_DOB==1 | af_extract$Rx_DOB_P41==1) &
+                          af_extract$ndc %in% c("H0020", "G2067", "G2078", "S0109", "J1230"), ]
+# extract <- extract[!(extract$ndc=="H0020" | extract$ndc %in% redbook_methadone$ndcnum), ]
+basic <- basic[!(basic$studyid %in% methadone$StudyID), ]
+
+# AL ADDED:
+n_step4          <- nrow(basic)
+n_excl_methadone <- n_step3 - n_step4
 cat("After excluding methadone users:", formatC(n_step4, format = "d", big.mark = ","),
     "| Excluded:", n_excl_methadone, "\n")
+## Excluded = 0
+## This was an error in the original code; people were dropped who shouldn't have been. 
+
+
 
 # Unique pregnancies with BTrack==90 methadone
 methadone_90_ids <- unique(methadone$StudyID[methadone$BTrack==90])
@@ -467,8 +482,6 @@ cat("Pregnancies with BTrack==90 methadone:", length(methadone_90_ids), "\n")
 methadone_180_only_ids <- unique(methadone$StudyID[methadone$BTrack==180 &
                                                      !methadone$StudyID %in% methadone_90_ids])
 cat("Pregnancies with BTrack==180 methadone only:", length(methadone_180_only_ids), "\n")
-
-
 
 
 
@@ -1156,7 +1169,6 @@ basic$fdate.from.deliv = basic$fdate_seg1_day + 42
 # only want outcomes up to 1 year post delivery, which is day 323 from 42 days of delivery
 basic <- basic[basic$days.to.event.from.deliv <= 365, ]
 
-
 # Loss of enrollment within 1 year of delivery
 basic$loss.enroll <- ifelse(basic$cat1_seg1==1 & basic$fdate.from.deliv <=365, 1, 0)
 label(basic$loss.enroll) <- "Loss of enrollment within 1-year of delivery"
@@ -1308,9 +1320,26 @@ label(basic$total.rx.days.exp) <- "Total days supplied MOUD"
 label(basic$total.rx.days.total_3bup) <- "Total days supplied buprenorphine"
 moud <- basic[basic$moud.yes==1, ]
 
+n_step6       <- nrow(moud)                                                                                                                                  
+n_excl_nomoud <- n_step5 - n_step6     
+cat("Final analytic sample (MOUD receipt):", formatC(n_step6, format = "d", big.mark = ","),
+    "| Excluded (no MOUD receipt):", n_excl_nomoud, "\n")
+# Final analytic sample (MOUD receipt): 9,419 | Excluded (no MOUD receipt): 7802 
+
+# AL: 
+table(moud$rxtype, useNA = "always")
+#BUP only: 9084
+#Naltrexone only: 232
+#Both: 103
+
 # save moud data
 write.csv(moud, file="moud_cohort_202601.csv", row.names = FALSE)
-save(moud, n_step1, file="moud_cohort_202601-ashley.Rdata")
+save(moud, basic,                                                                                                                                            
+     n_step1,
+     n_step2, n_excl_twins,
+     n_step3, n_excl_od_exposure,
+     n_step6, n_excl_nomoud,
+     file="moud_cohort_202601-ashley.Rdata")
 save.image(file="moud_cohort_all_tables_202601.Rdata")
 
 
