@@ -309,7 +309,7 @@ basic <- merge(basic, comorb, by.x = "studyid", by.y = "StudyID", all.x = TRUE)
 # basic <- basic[basic$studyid %in% comorb$StudyID, ] # previous line 285; AL commented this line out; 
 
 # AL: handle missingness at the analysis stage; We want all people for unadjusted analysis
-# AL: Line 285 (now line 303) removes anyone not in the "comorb" file, so they are dropped from the study
+# AL: Line 285 (now line 309) removes anyone not in the "comorb" file, so they are dropped from the study
 # entirely, even though their data is perfectly complete but just don't have any comorbidities. 
 # The "route of delivery issue above" only caught truly missing data on all 63 people; 
 # Line 285 catches missing data (63 people) plus people without the listed comorbidities.  
