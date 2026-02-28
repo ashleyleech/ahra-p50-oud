@@ -20,6 +20,7 @@ library(kableExtra)
 # library(rms)
 # library(mice)
 # library(PSW)
+library(readxl)
 
 load("/Volumes/HPLWork1/p50_oud/Ashley/Ahra2/G5_data_202509.Rdata")
 ndc <- read.csv("/Volumes/HPLWork1/p50_oud/Ashley/Ahra2/NDCs_2020.csv", colClasses = c(ndcnum = "character"))
@@ -213,7 +214,7 @@ cat("StudyIDs missing at least one key covariate:", length(missing_any_key), "\n
 
 # AL ADDITION: Check if any missingness in the delivery category
 # Check af_cov directly - filter to current basic StudyIDs, BTrack==90                                       
-af_cov_check <- af_cov[af_cov$StudyID %in% basic$StudyID & af_cov$BTrack == 90, ]                                  
+af_cov_check <- af_cov[af_cov$StudyID %in% basic$studyid & af_cov$BTrack == 90, ]                                  
 
 # Deduplicate since af_cov has multiple rows per StudyID (one per condition)                                       
 af_cov_check_u <- af_cov_check[!duplicated(af_cov_check$StudyID), ]                                                
@@ -225,7 +226,7 @@ sum(!af_cov_check_u$DeliveryCesarean %in% "Y" &
       !af_cov_check_u$DeliveryVacuum   %in% "Y")
 
 # How many StudyIDs in basic have no record in af_cov at all?
-sum(!basic$StudyID %in% af_cov$StudyID)
+sum(!basic$studyid %in% af_cov$StudyID)
 # Results above: 0 & 0, meaning everyone is in the af_cov and everyone has at least one delivery route marked "Y"
 
 
@@ -285,36 +286,30 @@ comorb <- af_cov3 %>% group_by(StudyID) %>%
   ungroup() %>% as.data.frame()
 
 basic <- merge(basic, comorb, by.x = "studyid", by.y = "StudyID", all.x = TRUE)
-
-# AL: Check whether healthy people are being removed accidentally by line 285: 
-# this next line of code: basic <- basic[basic$studyid %in% comorb$StudyID, ]
-
-# Who gets removed by line 285?                                                                                                                              
-# removed_by_285 <- basic$studyid[!basic$studyid %in% comorb$StudyID]                                
-# cat("Total removed by line 285:", length(removed_by_285), "\n")  
-# Total removed by line 285: 590
-
-# Of those, how many are completely absent from af_cov?                                                                                                      
-# absent_from_afcov <- removed_by_285[!toupper(removed_by_285) %in% toupper(af_cov$StudyID)]
-# cat("Absent from af_cov entirely:", length(absent_from_afcov), "\n")
-# Absent from af_cov entirely: 63 
-
-# Of those, how many ARE in af_cov but just have no conditions?
-# in_afcov_no_conditions <- removed_by_285[toupper(removed_by_285) %in% toupper(af_cov$StudyID)]
-# cat("In af_cov but no conditions (potentially healthy):", length(in_afcov_no_conditions), "\n")
-# In af_cov but no conditions (potentially healthy): 527 in the af_cov but with no conditions in the 
-# 16-item tracked comorbidity list. 
+## AL: This merge code makes sense; what didn't make sense was the subsequent code after this in the original
+# script: "basic <- basic[basic$studyid %in% comorb$StudyID, ]", which I commented out. 
+# See check below. 
 
 # remove those with missing comorbidities
-# basic <- basic[basic$studyid %in% comorb$StudyID, ] # previous line 285; AL commented this line out; 
+# basic <- basic[basic$studyid %in% comorb$StudyID, ] # original code line 202; AL commented this line out; 
 
+# AL check: 
+# Those removed by the original line 285--though Ahra meant to just remove the 63 without any of the birth
+# certificate variables. 
 # AL: handle missingness at the analysis stage; We want all people for unadjusted analysis
-# AL: Line 285 (now line 309) removes anyone not in the "comorb" file, so they are dropped from the study
-# entirely, even though their data is perfectly complete but just don't have any comorbidities. 
-# The "route of delivery issue above" only caught truly missing data on all 63 people; 
-# Line 285 catches missing data (63 people) plus people without the listed comorbidities.  
-# The prior code, they had NAs for delivery route because they had no data in af_cov at all; 
-# it was not about delivery route specifically--it was just the first NA check that caught them. 
+
+# removed_by_285 <- basic$studyid[!basic$studyid %in% comorb$StudyID]
+# cat("Total that original line 285 would remove:", length(removed_by_285), "\n")
+
+# Truly missing from af_cov vs. in af_cov but no conditions
+# absent_from_afcov <- removed_by_285[!toupper(removed_by_285) %in% toupper(af_cov$StudyID)]
+# in_afcov_no_cond  <- removed_by_285[toupper(removed_by_285) %in% toupper(af_cov$StudyID)]
+
+# cat("  Absent from af_cov entirely (truly missing):", length(absent_from_afcov), "\n")
+# cat("  In af_cov but zero comorbidities (healthy, wrongly removed):", length(in_afcov_no_cond), "\n")
+
+# meant to exclude 63 missing birth certificate data but excluded an additional 527 who had no comorbidities
+# (depression/anxiety/other substance use/etc.)
 
 comorbidities <- names(comorb)[-1] #AL changed to -1, removing manual index update, will capture all
 comorblabs <- gsub("_", " ", comorbidities)
@@ -1321,7 +1316,7 @@ label(basic$total.rx.days.total_3bup) <- "Total days supplied buprenorphine"
 moud <- basic[basic$moud.yes==1, ]
 
 n_step6       <- nrow(moud)                                                                                                                                  
-n_excl_nomoud <- n_step5 - n_step6     
+n_excl_nomoud <- n_step4 - n_step6     
 cat("Final analytic sample (MOUD receipt):", formatC(n_step6, format = "d", big.mark = ","),
     "| Excluded (no MOUD receipt):", n_excl_nomoud, "\n")
 # Final analytic sample (MOUD receipt): 9,419 | Excluded (no MOUD receipt): 7802 
@@ -1332,6 +1327,301 @@ table(moud$rxtype, useNA = "always")
 #Naltrexone only: 232
 #Both: 103
 
+
+
+
+# AL: Create OPIOID PAIN FLAG; for PS; final MOUD cohort only 
+# Any opioid for pain (not MOUD) in exposure window: -90 to +41 days                                                                                                         
+
+library(readxl)                                                                                                                                                              
+
+# CDC opioid list: all non-buprenorphine opioids only                                                                                                                        
+cdc_opioids   <- read_excel("CDC_opioid NDC_oral MME conversion_update_2020.xlsx", sheet = "Opioids")
+cdc_non_bup   <- cdc_opioids[cdc_opioids$Drug != "Buprenorphine", ]
+cdc_pain_ndcs <- unique(cdc_non_bup$NDC)
+
+# Redbook methadone: all routes (oral + injectable + IV)
+redbook_meth        <- read.csv("redbook_methadone.csv")
+redbook_meth$ndcpad <- suppressWarnings(sprintf("%011.0f", as.numeric(redbook_meth$ndcnum)))
+redbook_meth_ndcs   <- unique(redbook_meth$ndcpad[!is.na(suppressWarnings(as.numeric(redbook_meth$ndcnum)))])
+
+# Buprenorphine pain NDC overlap check
+# Includes all buprenorphine pain files:
+# CDC (patches + Belbuca), Buprenex/Belbuca/Butrans csv, generic transdermal, HCl powder/solution
+cdc_bup_pain  <- cdc_opioids[cdc_opioids$Drug == "Buprenorphine" &
+                               (cdc_opioids$Master_Form == "Patch, Extended Release" |
+                                  cdc_opioids$PRODNME == "BELBUCA" |
+                                  cdc_opioids$PRODNME == "BUTRANS"),]
+                             
+bup_csv        <- read.csv("NDCs_2020_Buprenex_Belbuca_Butrans.csv", colClasses = c(NDCNUM = "character"))
+bup_trans      <- read_excel("ndcnum_bup_transdermal.xlsx")
+bup_trans_ndcs <- sprintf("%011.0f", as.numeric(bup_trans$ndcnum))
+bup_hcl        <- read_excel("ndcnum_BupHCl_powder_solution.xlsx")
+bup_hcl_ndcs   <- sprintf("%011.0f", as.numeric(bup_hcl$ndcnum))
+all_bup_pain_ndcs <- unique(c(as.character(cdc_bup_pain$NDC),
+                              bup_csv$NDCNUM,
+                              bup_trans_ndcs,
+                              bup_hcl_ndcs))
+
+# ndc is from NDCs_2020.csv — the MOUD NDC reference list loaded at top 
+bup_overlap_ndcs <- all_bup_pain_ndcs[all_bup_pain_ndcs %in% ndc$ndcnum]
+cat("Buprenorphine pain NDCs also in MOUD list (NDCs_2020.csv):",
+    length(bup_overlap_ndcs), "of", length(all_bup_pain_ndcs), "\n")
+
+# Standardize NDCs 
+# sprintf uses float format — handles all 11-digit NDCs correctly
+# formatC format="d" uses integer format — which maxes out above 2,147,483,647
+# causing wrong values and false matches
+# The below code leaves HCPCS codes unchanged but standardizes NDC codes via "grepl"
+af_ext_df         <- as.data.frame(af_extract)
+af_ext_df$ndc_std <- ifelse(grepl("^[0-9]+$", af_ext_df$ndc),
+                            suppressWarnings(sprintf("%011.0f", as.numeric(af_ext_df$ndc))),
+                            af_ext_df$ndc)
+
+af_exp_moud <- af_ext_df[af_ext_df$BTrack == 90 &
+                           (af_ext_df$Rx_B90_DOB == 1 | af_ext_df$Rx_DOB_P41 == 1) &
+                           af_ext_df$StudyID %in% moud$studyid, ]
+
+
+bup_overlap_hits <- af_exp_moud[af_exp_moud$ndc_std %in% bup_overlap_ndcs, ]
+bup_pain_hits    <- af_exp_moud[af_exp_moud$ndc_std %in% all_bup_pain_ndcs, ]
+cat("MOUD pregnancies with any buprenorphine pain NDC fill:",
+    length(unique(bup_pain_hits$StudyID)), "\n")
+cat("  Of those, from overlapping NDCs (ambiguous):",
+    length(unique(bup_overlap_hits$StudyID)), "\n")
+# 3 MOUD pregnancies had any buprenorphine pain NDC fill:
+#   - 2 filled NDCs also in the MOUD list (NDCs_2020.csv) — use is ambiguous
+#     (could be pain or OUD treatment), so excluded from pain flag
+#   - 1 filled an NDC only on the pain list, not in the MOUD list —
+#     captured in bup_pain_ndcs_clean below
+# Note: bup_hcl has 52/52 NDCs in the MOUD list; the 2 ambiguous pregnancies
+# come from bup_hcl fills specifically
+
+# Non-overlapping buprenorphine pain NDCs — unambiguous pain fills
+# (not in MOUD list); captures the 1 remaining pregnancy from the 3 above
+bup_csv_clean       <- bup_csv$NDCNUM[!bup_csv$NDCNUM %in% ndc$ndcnum] #removes the NDCs that overlap with the MOUD list, keeps the remaining. 
+bup_trans_clean     <- bup_trans_ndcs[!bup_trans_ndcs %in% ndc$ndcnum] #removes the NDCs that overlap with MOUD list, keeps the remaining. 
+cdc_bup_pain_clean  <- as.character(cdc_bup_pain$NDC)[!as.character(cdc_bup_pain$NDC) %in% ndc$ndcnum] #CDC files, removes any that overlap with MOUD list, keeps the remaining.
+bup_pain_ndcs_clean <- unique(c(bup_csv_clean, bup_trans_clean, cdc_bup_pain_clean)) #combines all three cleaned lists into one final set of unambiguous buprenorphien pain NDCs. 
+
+# Final pain NDC list — includes non-overlapping buprenorphine pain NDCs
+all_pain_ndcs <- unique(c(cdc_pain_ndcs, redbook_meth_ndcs, bup_pain_ndcs_clean))
+cat("Total unique pain opioid NDCs:", length(all_pain_ndcs), "\n")
+
+
+# Unique pregnancy IDs with pain opioid fills by period
+pain_ids_overall <- unique(af_exp_moud$StudyID[af_exp_moud$ndc_std %in% all_pain_ndcs])
+pain_ids_pre     <- unique(af_exp_moud$StudyID[af_exp_moud$ndc_std %in% all_pain_ndcs &
+                                                 af_exp_moud$Rx_B90_DOB == 1])
+pain_ids_post    <- unique(af_exp_moud$StudyID[af_exp_moud$ndc_std %in% all_pain_ndcs &
+                                                 af_exp_moud$Rx_DOB_P41 == 1])
+
+# Flags in moud
+moud$pain_opioid_rx   <- as.integer(moud$studyid %in% pain_ids_overall)
+label(moud$pain_opioid_rx) <- "Any pain opioid Rx in exposure window (not MOUD)"
+
+moud$pain_opioid_pre  <- as.integer(moud$studyid %in% pain_ids_pre)
+label(moud$pain_opioid_pre) <- "Pain opioid Rx pre-delivery (90-day window)"
+
+moud$pain_opioid_post <- as.integer(moud$studyid %in% pain_ids_post)
+label(moud$pain_opioid_post) <- "Pain opioid Rx post-delivery (0 to +41 days)"
+
+moud$pain_opioid_timing <- ifelse(
+  moud$pain_opioid_pre == 1 & moud$pain_opioid_post == 1, "Both",
+  ifelse(moud$pain_opioid_pre  == 1, "Pre-delivery only",
+         ifelse(moud$pain_opioid_post == 1, "Post-delivery only", "None")))
+moud$pain_opioid_timing <- factor(moud$pain_opioid_timing,
+                                  levels = c("None", "Pre-delivery only",
+                                             "Post-delivery only", "Both"))
+label(moud$pain_opioid_timing) <- "Pain opioid Rx timing relative to delivery"
+
+# Summary
+pct <- function(x) paste0(round(mean(x, na.rm = TRUE) * 100, 1), "%")
+cat("\n Pain opioid Rx — MOUD cohort (n =", nrow(moud), ") \n")
+cat("Any pain opioid:    ", sum(moud$pain_opioid_rx),
+    paste0("(", pct(moud$pain_opioid_rx), ")\n"))
+cat("Pre-delivery only:  ", sum(moud$pain_opioid_timing == "Pre-delivery only"), "\n")
+cat("Post-delivery only: ", sum(moud$pain_opioid_timing == "Post-delivery only"), "\n")
+cat("Both:               ", sum(moud$pain_opioid_timing == "Both"), "\n")
+cat("None:               ", sum(moud$pain_opioid_timing == "None"), "\n")
+
+
+
+
+
+
+
+
+# TEST CODE re. 1,983 pregnancies that were added: 
+
+# Breakdown of the 1,983 pregnancies added via MOUD pharmacy fill only                                                                                                       
+# (Expose1==0 but had an MOUD fill in extract — not captured by diagnosis alone)                                                                                           
+added_ids <- basic$studyid[basic$expose1 == 0 & basic$filledrx == 1]                                                                                                         
+cat("Pregnancies added via MOUD pharmacy fill only:", length(added_ids), "\n")
+
+# Their MOUD fills from extract                                                                                                                                            
+extract_added <- extract[extract$StudyID %in% added_ids, ]
+
+# For HCPCS codes, gennme is NA after the ndc merge — label them by code
+extract_added$med_type <- ifelse(!is.na(extract_added$gennme), extract_added$gennme,
+                                 ifelse(extract_added$ndc %in% c("J0571","J0572","J0573",
+                                                                 "J0574","J0575","G2068",
+                                                                 "G2069","G2070","G2072",
+                                                                 "G2079"), "Buprenorphine (HCPCS)",
+                                        ifelse(extract_added$ndc %in% c("J2315"), "Naltrexone (HCPCS)",
+                                               ifelse(extract_added$ndc %in% c("Q9991","Q9992"), "Buprenorphine (HCPCS)",
+                                                      ifelse(extract_added$ndc %in% c("S0109"), "Buprenorphine (HCPCS)",
+                                                             "Other")))))
+
+# Summarise per pregnancy — which medication types did they fill?
+med_summ <- extract_added %>%
+  group_by(StudyID) %>%
+  summarise(
+    bup_mono   = as.integer(any(grepl("Buprenorphine", med_type, ignore.case = TRUE) &
+                                  !grepl("Naloxone",   med_type, ignore.case = TRUE))),
+    bup_nal    = as.integer(any(grepl("Buprenorphine", med_type, ignore.case = TRUE) &
+                                  grepl("Naloxone",   med_type, ignore.case = TRUE))),
+    naltrexone = as.integer(any(grepl("Naltrexone",   med_type, ignore.case = TRUE))),
+    .groups = "drop"
+  ) %>%
+  mutate(rx_type = case_when(
+    bup_nal  == 1 & naltrexone == 0                        ~ "Buprenorphine/Naloxone only",
+    bup_mono == 1 & bup_nal == 0 & naltrexone == 0         ~ "Buprenorphine mono only",
+    naltrexone == 1 & bup_mono == 0 & bup_nal == 0         ~ "Naltrexone only",
+    TRUE                                                   ~ "Multiple medication types"
+  ))
+
+cat("\nMedication breakdown — mutually exclusive:\n")
+print(table(med_summ$rx_type))
+
+cat("\nNaltrexone StudyIDs:\n")
+print(med_summ$StudyID[grepl("Naltrexone", med_summ$rx_type)])
+
+# Were any of the 1,983 added using NDCs that also appear in the buprenorphine pain list?
+# i.e. added to MOUD cohort via an NDC that is ambiguous (pain vs OUD)
+extract_added$ndc_std <- ifelse(grepl("^[0-9]+$", extract_added$ndc),
+                                suppressWarnings(sprintf("%011.0f", as.numeric(extract_added$ndc))),
+                                extract_added$ndc)
+
+bup_overlap_in_added <- extract_added[extract_added$ndc_std %in% bup_overlap_ndcs, ]
+cat("\nOf the", length(added_ids), "added pregnancies:\n")
+cat("Added using NDCs overlapping with buprenorphine pain list:",
+    length(unique(bup_overlap_in_added$StudyID)), "\n")
+if (length(unique(bup_overlap_in_added$StudyID)) > 0) {
+  cat("Their StudyIDs:\n")
+  print(unique(bup_overlap_in_added$StudyID))
+}
+
+
+# Product names for buprenorphine in the pharmacy-only added pregnancies
+added_pharma_ids <- moud$studyid[moud$expose1 == 0 & moud$filledrx == 1]
+
+# extract is already BTrack==90 and has prodnme merged from ndc
+added_fills_exp <- extract[
+  tolower(extract$StudyID) %in% added_pharma_ids &
+    (extract$Rx_B90_DOB == 1 | extract$Rx_DOB_P41 == 1), ]
+
+bup_fills <- added_fills_exp[
+  !is.na(added_fills_exp$gennme) &
+    grepl("buprenorphine", added_fills_exp$gennme, ignore.case = TRUE), ]
+
+cat("Product names for buprenorphine MOUD fills in added pregnancies:\n")
+print(sort(table(bup_fills$prodnme), decreasing = TRUE))
+
+
+
+
+
+
+
+## MORE TEST CODE TO CONFIRM CHAD'S ERROR
+
+# ============================================================                                                                                                                    
+# Diagnostic: Added pregnancies (Expose1==0 + pharmacy fill)                                                                                                                      
+# ============================================================                                                                                                                    
+added_ids <- moud$studyid[moud$expose1 == 0 & moud$filledrx == 1]                                                                                                               
+
+# Pull exposure-window fills for added pregnancies only                                                                                                                           
+added_fills <- extract[                                                                                                                                                           
+  tolower(extract$StudyID) %in% added_ids &                                                                                                                                       
+    (extract$Rx_B90_DOB == 1 | extract$Rx_DOB_P41 == 1), ]                                                                                                                        
+
+bup_added_fills <- added_fills[
+  !is.na(added_fills$gennme) &
+    grepl("buprenorphine", added_fills$gennme, ignore.case = TRUE), ]
+nal_added_fills <- added_fills[
+  !is.na(added_fills$gennme) &
+    grepl("naltrexone", added_fills$gennme, ignore.case = TRUE), ]
+
+bup_added_ids <- unique(tolower(bup_added_fills$StudyID))
+nal_added_ids <- unique(tolower(nal_added_fills$StudyID))
+
+# ============================================================
+# (1) BUP fills: confirm no OUD diagnosis
+# ============================================================
+cat("=== (1) BUP fills: OUD diagnosis check ===\n")
+cat("Added pregnancies with BUP fills:", length(bup_added_ids), "\n")
+cat("Of those, with Expose1==1 (OUD diagnosis per SAS pipeline):",
+    sum(moud$expose1[moud$studyid %in% bup_added_ids] == 1), "\n")
+# Expected: 0 — expose1==0 is the definition of the 'added' group,
+# meaning the SAS pipeline found no OUD dx for these individuals.
+# The reason they were missed was the p5 bug (BUP_TWindow not stacked),
+# not absence of the SAS OUD lookup — so this confirms they have no OUD dx.
+
+# ============================================================
+# (2) Naltrexone: NAL-only vs concurrent with BUP
+# ============================================================
+cat("\n=== (2) Naltrexone: concurrent BUP? ===\n")
+cat("Added pregnancies with NAL fills:", length(nal_added_ids), "\n")
+
+nal_with_bup <- nal_added_ids[nal_added_ids %in% bup_added_ids]
+nal_only     <- nal_added_ids[!nal_added_ids %in% bup_added_ids]
+
+cat("  NAL + concurrent BUP in exposure window:", length(nal_with_bup), "\n")
+cat("  NAL only (no BUP fills in window):",       length(nal_only),     "\n")
+
+# Show product names for NAL-only group
+if (length(nal_only) > 0) {
+  nal_only_fills <- nal_added_fills[tolower(nal_added_fills$StudyID) %in% nal_only, ]
+  cat("  NAL-only product names:\n")
+  print(sort(table(nal_only_fills$prodnme), decreasing = TRUE))
+}
+
+# ============================================================
+# (3) Naltrexone: OUD dx, AUD dx, or both
+# ============================================================
+cat("\n=== (3) Naltrexone: OUD and/or AUD diagnosis ===\n")
+nal_moud <- moud[moud$studyid %in% nal_added_ids, ]
+
+cat("NAL added pregnancies — OUD diagnosis (Expose1==1):",
+    sum(nal_moud$expose1 == 1, na.rm = TRUE),
+    "— expected 0 (added group is Expose1==0 by definition)\n")
+
+cat("NAL added pregnancies — AUD diagnosis (alc_usedis==1):",
+    sum(nal_moud$alc_usedis == 1, na.rm = TRUE), "\n")
+
+cat("\nCross-tab OUD x AUD for NAL added pregnancies:\n")
+print(table(
+  OUD = ifelse(nal_moud$expose1 == 1, "Yes", "No"),
+  AUD = ifelse(!is.na(nal_moud$alc_usedis) & nal_moud$alc_usedis == 1, "Yes", "No"),
+  useNA = "ifany"
+))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # save moud data
 write.csv(moud, file="moud_cohort_202601.csv", row.names = FALSE)
 save(moud, basic,                                                                                                                                            
@@ -1339,7 +1629,8 @@ save(moud, basic,
      n_step2, n_excl_twins,
      n_step3, n_excl_od_exposure,
      n_step6, n_excl_nomoud,
-     file="moud_cohort_202601-ashley.Rdata")
-save.image(file="moud_cohort_all_tables_202601.Rdata")
+     all_pain_ndcs, # added pain ndcs here
+     file="moud_cohort_202601-ashley.Rdata") #this file has moud, basic, and flow diagram counts
+save.image(file="moud_cohort_all_tables_202601.Rdata") # this has everything, moud, basic, af_extract, af_cov, af_master, af_outcomes, etc.
 
 
