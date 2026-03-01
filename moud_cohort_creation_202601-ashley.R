@@ -1536,9 +1536,10 @@ print(sort(table(bup_fills$prodnme), decreasing = TRUE))
 
 ## MORE TEST CODE TO CONFIRM CHAD'S ERROR
 
-# ============================================================                                                                                                                    
-# Diagnostic: Added pregnancies (Expose1==0 + pharmacy fill)                                                                                                                      
-# ============================================================                                                                                                                    
+############################################################
+# Added pregnancies (Expose1==0 + pharmacy fill)
+############################################################
+
 added_ids <- moud$studyid[moud$expose1 == 0 & moud$filledrx == 1]                                                                                                               
 
 # Pull exposure-window fills for added pregnancies only                                                                                                                           
@@ -1556,9 +1557,10 @@ nal_added_fills <- added_fills[
 bup_added_ids <- unique(tolower(bup_added_fills$StudyID))
 nal_added_ids <- unique(tolower(nal_added_fills$StudyID))
 
-# ============================================================
+############################################################
 # (1) BUP fills: confirm no OUD diagnosis
-# ============================================================
+############################################################
+
 cat("=== (1) BUP fills: OUD diagnosis check ===\n")
 cat("Added pregnancies with BUP fills:", length(bup_added_ids), "\n")
 cat("Of those, with Expose1==1 (OUD diagnosis per SAS pipeline):",
@@ -1568,9 +1570,9 @@ cat("Of those, with Expose1==1 (OUD diagnosis per SAS pipeline):",
 # The reason they were missed was the p5 bug (BUP_TWindow not stacked),
 # not absence of the SAS OUD lookup — so this confirms they have no OUD dx.
 
-# ============================================================
+############################################################
 # (2) Naltrexone: NAL-only vs concurrent with BUP
-# ============================================================
+############################################################
 cat("\n=== (2) Naltrexone: concurrent BUP? ===\n")
 cat("Added pregnancies with NAL fills:", length(nal_added_ids), "\n")
 
@@ -1587,9 +1589,9 @@ if (length(nal_only) > 0) {
   print(sort(table(nal_only_fills$prodnme), decreasing = TRUE))
 }
 
-# ============================================================
+############################################################
 # (3) Naltrexone: OUD dx, AUD dx, or both
-# ============================================================
+############################################################
 cat("\n=== (3) Naltrexone: OUD and/or AUD diagnosis ===\n")
 nal_moud <- moud[moud$studyid %in% nal_added_ids, ]
 
@@ -1606,31 +1608,114 @@ print(table(
   AUD = ifelse(!is.na(nal_moud$alc_usedis) & nal_moud$alc_usedis == 1, "Yes", "No"),
   useNA = "ifany"
 ))
+# All 60 naltrexone pregnancies have OUD = No
+# 55 have neither OUD nor AUD diagnoses 
+# 5 have an AUD diagnosis but no OUD diagnosis
+
+## PLAN: (1) Drop the 5 with AUD dx; Keep the 55 without a dx but do a SA by dropping them 
 
 
 
 
+############################################################################                                                                                                                    
+# Naltrexone: concurrent BUP — full moud cohort                                                                                                                                   
+# How many NAL users also have BUP fills in the exposure window?                                                                                                                  
+# The SAS NAL_BUP_MET logic would have captured NAL + concurrent BUP.
+############################################################################
+
+# All exposure-window fills for the full moud cohort
+moud_fills_all <- extract[
+  tolower(extract$StudyID) %in% moud$studyid &
+    (extract$Rx_B90_DOB == 1 | extract$Rx_DOB_P41 == 1), ]
+
+# NAL and BUP fill IDs across full cohort
+nal_all_ids <- unique(tolower(moud_fills_all$StudyID[
+  !is.na(moud_fills_all$gennme) &
+    grepl("naltrexone", moud_fills_all$gennme, ignore.case = TRUE)]))
+
+bup_all_ids <- unique(tolower(moud_fills_all$StudyID[
+  !is.na(moud_fills_all$gennme) &
+    grepl("buprenorphine", moud_fills_all$gennme, ignore.case = TRUE)]))
+
+nal_all_with_bup <- nal_all_ids[nal_all_ids %in% bup_all_ids]
+nal_all_only     <- nal_all_ids[!nal_all_ids %in% bup_all_ids]
+
+cat("=== Naltrexone: concurrent BUP — full moud cohort (n =", nrow(moud), ") ===\n")
+cat("Total NAL users in exposure window:", length(nal_all_ids), "\n")
+cat("  NAL + concurrent BUP:", length(nal_all_with_bup), "\n")
+cat("  NAL only (no BUP):  ", length(nal_all_only), "\n\n")
+
+# Break out the NAL-only group: added vs. original (Expose1==1)
+nal_only_added    <- nal_all_only[nal_all_only %in%
+                                    moud$studyid[moud$expose1 == 0 & moud$filledrx == 1]]
+nal_only_original <- nal_all_only[!nal_all_only %in% nal_only_added]
+
+cat("  Of the NAL-only pregnancies:\n")
+cat("    Added via pharmacy fill (Expose1==0):", length(nal_only_added), "\n")
+cat("    Original cohort (Expose1==1):        ", length(nal_only_original), "\n")
+
+cat("=== NAL-only: OUD diagnosis breakdown ===\n")
+nal_only_orig_moud <- moud[moud$studyid %in% nal_only_original, ]
+
+cat("NAL-only, original cohort (Expose1==1):", length(nal_only_original), "\n")
+cat("  With OUD dx (Expose1==1):", sum(nal_only_orig_moud$expose1 == 1), "\n")
+cat("  Without OUD dx (Expose1==0):", sum(nal_only_orig_moud$expose1 == 0), "\n")
+# Expected: all 172 have Expose1==1 from OUD diagnosis since no BUP means
+# NAL_BUP_MET could not have qualified them — OUD dx is the only path
+
+cat("\nNAL-only, added via pharmacy fill (Expose1==0):", length(nal_only_added), "\n")
+cat("  With AUD dx:", sum(moud$alc_usedis[moud$studyid %in% nal_only_added] == 1, na.rm = TRUE), "\n")
+cat("  No OUD or AUD dx:", sum(moud$alc_usedis[moud$studyid %in% nal_only_added] == 0 |
+                                 is.na(moud$alc_usedis[moud$studyid %in% nal_only_added])), "\n")
 
 
+## 335 total NAL users
+# 60 added + 172 original = 232 NAL only 
+# + 103 = concurrent with BUP (picked up in original SAS cohort) (103 + 232 = 335 total)
+# The 172 original was in the original cohort because they had an OUD DX. 
 
 
+############################################################################
+# Drop all 60 added naltrexone pregnancies: 
+# 5 have AUD diagnosis only (no OUD dx) - clear misclassification 
+# 55 have neither OUD or AUD diagnosis -- insufficient evidence for OUD
+############################################################################
 
+cat("\n=== Naltrexone added pregnancies: OUD/AUD breakdown ===\n")
+cat("StudyIDs with AUD dx only (n = 5):\n")
+print(nal_aud_only)
 
+cat("\nStudyIDs with no OUD or AUD dx (n = 55):\n")
+print(nal_sensitivity_drop_ids)
 
+moud <- moud[!moud$studyid %in% nal_added_ids, ]
 
+n_step7        <- nrow(moud)
+n_excl_nal_aud <- n_step6 - n_step7
+cat("\nAfter excluding all added naltrexone pregnancies (no clear OUD evidence):",
+    formatC(n_step7, format = "d", big.mark = ","),
+    "| Excluded:", n_excl_nal_aud, "\n")
 
 
 
 
 # save moud data
 write.csv(moud, file="moud_cohort_202601.csv", row.names = FALSE)
-save(moud, basic,                                                                                                                                            
+save(moud, basic,
      n_step1,
      n_step2, n_excl_twins,
      n_step3, n_excl_od_exposure,
      n_step6, n_excl_nomoud,
-     all_pain_ndcs, # added pain ndcs here
+     n_step7, n_excl_nal_aud,  # naltrexone AUD-only exclusion
+     all_pain_ndcs,            # pain NDC list
+     nal_aud_only,             # 5 dropped: naltrexone + AUD dx only, no OUD dx
+     nal_rest_drop_ids, # 55 to drop, didn't have either an OUD or AUD dx, not definitely OUD
      file="moud_cohort_202601-ashley.Rdata") #this file has moud, basic, and flow diagram counts
 save.image(file="moud_cohort_all_tables_202601.Rdata") # this has everything, moud, basic, af_extract, af_cov, af_master, af_outcomes, etc.
+
+
+
+
+
 
 

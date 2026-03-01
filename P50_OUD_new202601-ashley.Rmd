@@ -102,49 +102,56 @@ This project focuses on Analysis 2 of the Study Protocol, which aims to characte
 
 # Study Flow Chart
 
-```{r flowchart, fig.cap="* Methadone exclusion: n=0 (TennCare OTP coverage began June 2020). Follow-up >1 year exclusion: n=0 (days to event already capped at 365 days)."}                                                                                                                                                            
-  library(DiagrammeR)                                                                                                                                                 
-                                                                                                                                                                      
-  n_bup <- sum(moud$rxtype == "Buprenorphine only", na.rm = TRUE)                                                                                                   
-  n_nal <- sum(moud$rxtype %in% c("Naltrexone only", "Both"), na.rm = TRUE)
+```{r flowchart, fig.cap="* Methadone exclusion: n=0 (TennCare OTP coverage began June 2020). Follow-up >1 year exclusion: n=0 (days to event already capped at 365 days)."}                  
+    library(DiagrammeR)                                                                                                                                                                         
+                                                                                                                                                                                                
+    n_bup <- sum(moud$rxtype == "Buprenorphine only", na.rm = TRUE)                                                                                                                           
+    n_nal <- sum(moud$rxtype %in% c("Naltrexone only", "Both"), na.rm = TRUE)                                                                                                                   
+                                                                                                                                                                                                
+    grViz(paste0('                                                                                                                                                                              
+    digraph consort {                                                                                                                                                                           
+      graph [layout = dot, rankdir = TB, fontname = Helvetica, nodesep = 1.5, ranksep = 0.6, splines = ortho]                                                                                   
 
-  grViz(paste0('
-  digraph consort {
-    graph [layout = dot, rankdir = TB, fontname = Helvetica, nodesep = 0.8, ranksep = 0.6, splines = ortho]
+      node [shape = rectangle, fontname = Helvetica, fontsize = 11,
+            style = filled, fillcolor = white, width = 4.5, height = 1]
+      B1 [label = "Pregnancies meeting enrollment criteria:\\nAge 15-44; evidence of OUD (diagnosis and/or medication for OUD);\\ndelivered an infant \u226520 weeks gestation,
+  2007-2020;\\ncontinuous TennCare enrollment (-90 through +41 days of delivery);\\ngaps in enrollment \u22645 days; no sickle cell disease\\nn = ', formatC(n_step1, format="d", big.mark=","),
+   '", height = 1.8]
+      B2 [label = "After excluding duplicate records from\\nmultiple gestation deliveries (twins/triplets)\\nn = ', formatC(n_step2, format="d", big.mark=","), '"]
+      B3 [label = "After excluding overdose in exposure window\\nn = ', formatC(n_step3, format="d", big.mark=","), '"]
+      B4 [label = "\u22651 day MOUD receipt\\nn = ', formatC(n_step6, format="d", big.mark=","), '"]
+      B5 [label = "Final analytic sample\\nn = ', formatC(n_step7, format="d", big.mark=","), '"]
 
-    node [shape = rectangle, fontname = Helvetica, fontsize = 11,
-          style = filled, fillcolor = white, width = 4.5, height = 1]
-    B1 [label = "Pregnancies with OUD evidence\\n(OUD diagnosis or MOUD prescription, BTrack=90)\\nn = ', formatC(n_step1, format="d", big.mark=","), '"]
-    B2 [label = "After excluding duplicate records from\\nmultiple gestation deliveries (twins/triplets)\\nn = ', formatC(n_step2, format="d", big.mark=","), '"]
-    B3 [label = "After excluding overdose in exposure window\\nn = ', formatC(n_step3, format="d", big.mark=","), '"]
-    B4 [label = ">=1 day MOUD receipt (final analytic sample)\\nn = ', formatC(n_step6, format="d", big.mark=","), '"]
+      node [shape = rectangle, style = filled, fillcolor = "#f5f5f5", width = 3.5, height = 1]
+      E2 [label = "Excluded: duplicate records from\\nmultiple gestation deliveries\\nn = ', formatC(n_excl_twins, format="d", big.mark=","), '"]
+      E3 [label = "Excluded: overdose in\\nexposure window\\nn = ', formatC(n_excl_od_exposure, format="d", big.mark=","), '"]
+      E4 [label = "Excluded: no MOUD receipt\\nn = ', formatC(n_excl_nomoud, format="d", big.mark=","), '"]
+  E5 [label = "Excluded: naltrexone pregnancies\\nwith no clear OUD evidence\\n(5 AUD dx only; 55 neither OUD nor AUD dx)\\nn = ', formatC(n_excl_nal_aud, format="d", big.mark=","), '"]
 
-    node [shape = rectangle, style = filled, fillcolor = "#f5f5f5", width = 3.5, height = 1]
-    E2 [label = "Excluded: duplicate records from\\nmultiple gestation deliveries\\nn = ', formatC(n_excl_twins, format="d", big.mark=","), '"]
-    E3 [label = "Excluded: overdose in\\nexposure window\\nn = ', formatC(n_excl_od_exposure, format="d", big.mark=","), '"]
-    E4 [label = "Excluded: no MOUD receipt\\nn = ', formatC(n_excl_nomoud, format="d", big.mark=","), '"]
+      node [shape = rectangle, style = filled, fillcolor = "#d5e8d4", width = 3.5, height = 1]
+      S1 [label = "Buprenorphine only\\nn = ', formatC(n_bup, format="d", big.mark=","), '"]
+      S2 [label = "Naltrexone only (with OUD dx) or\\nwith buprenorphine\\nn = ', formatC(n_nal, format="d", big.mark=","), '"]
 
-    node [shape = rectangle, style = filled, fillcolor = "#d5e8d4", width = 3.5, height = 1]
-    S1 [label = "Buprenorphine only\\nn = ', formatC(n_bup, format="d", big.mark=","), '"]
-    S2 [label = "Naltrexone only or\\nwith buprenorphine\\nn = ', formatC(n_nal, format="d", big.mark=","), '"]
+      B1 -> B2 [tailport = s, headport = n]
+      B2 -> B3 [tailport = s, headport = n]
+      B3 -> B4 [tailport = s, headport = n]
+      B4 -> B5 [tailport = s, headport = n]
+      B5 -> S1 [tailport = s, headport = n]
+      B5 -> S2 [tailport = s, headport = n]
 
-    B1 -> B2
-    B1 -> E2 [constraint = false]
-    B2 -> B3
-    B2 -> E3 [constraint = false]
-    B3 -> B4
-    B3 -> E4 [constraint = false]
-    B4 -> S1
-    B4 -> S2
+      B2 -> E2 [constraint = false, tailport = e, headport = w]
+      B3 -> E3 [constraint = false, tailport = e, headport = w]
+      B4 -> E4 [constraint = false, tailport = e, headport = w]
+      B5 -> E5 [constraint = false, tailport = e, headport = w]
 
-    {rank = same; B2; E2}
-    {rank = same; B3; E3}
-    {rank = same; B4; E4}
-    {rank = same; S1; S2}
-  }
-  '))
+      {rank = same; B2; E2}
+      {rank = same; B3; E3}
+      {rank = same; B4; E4}
+      {rank = same; B5; E5}
+      {rank = same; S1; S2}
+    }
+    '))
 ```
-
 
 
 
